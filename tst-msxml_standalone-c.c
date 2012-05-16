@@ -34,10 +34,6 @@
 #include "ole2.h"
 #include "dispex.h"
 
-#include "initguid.h"
-#include "objsafe.h"
-#include "mshtml.h"
-
 /* undef the #define in msxml2 so that we can access all versions */
 #undef CLSID_DOMDocument
 
@@ -47,7 +43,6 @@
 int main(void)
 {
     IXMLDOMDocument *doc;
-    IUnknown *unk;
     HRESULT hr;
 
     hr = CoInitialize( NULL );
@@ -55,19 +50,22 @@ int main(void)
     if (hr == S_OK)
       printf("CoInitialize successful!\n");
     else
-      printf("Failed to init com\n");
+      {
+	printf("Failed to init com\n");
+	return 1;
+      }
 
-    if (hr != S_OK) return 1;
-#if 0
     hr = CoCreateInstance( &CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER, &IID_IXMLDOMDocument, (void**)&doc );
     if (hr != S_OK)
     {
         printf("IXMLDOMDocument is not available (0x%08x)\n", hr);
+
+	CoUninitialize();
         return 1;
     }
     printf("DOMDocument succesfully created\n");
-    // IXMLDOMDocument_Release(doc);
-    //doc->Release();
-#endif
+    IXMLDOMDocument_Release(doc);
+
+    CoUninitialize();
     return 0;
 }

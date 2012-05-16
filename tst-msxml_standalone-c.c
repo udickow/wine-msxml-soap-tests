@@ -46,6 +46,28 @@
 
 int main(void)
 {
-  printf("Hello world!\n");
-  return 0;
+    IXMLDOMDocument *doc;
+    IUnknown *unk;
+    HRESULT hr;
+
+    hr = CoInitialize( NULL );
+
+    if (hr == S_OK)
+      printf("CoInitialize successful!\n");
+    else
+      printf("Failed to init com\n");
+
+    if (hr != S_OK) return 1;
+#if 0
+    hr = CoCreateInstance( &CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER, &IID_IXMLDOMDocument, (void**)&doc );
+    if (hr != S_OK)
+    {
+        printf("IXMLDOMDocument is not available (0x%08x)\n", hr);
+        return 1;
+    }
+    printf("DOMDocument succesfully created\n");
+    // IXMLDOMDocument_Release(doc);
+    //doc->Release();
+#endif
+    return 0;
 }

@@ -23,6 +23,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+/* Build with: winegcc -m32 ... -lole32 -loleaut32 -luuid */
+
 #define COBJMACROS
 #define CONST_VTABLE
 
@@ -42,8 +44,6 @@
 /* From Wine source wine/test.h: */
 extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
 static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
-
-
 
 /* Parts of this file come from Wine's dlls/msxml3/tests/domdoc.c */
 
@@ -76,14 +76,29 @@ static void free_bstrs(void)
 }
 
 
+static void set_attr_str(IXMLDOMElement *elem, char *attr, char *str_val)
+{
+    HRESULT hr;
+    VARIANT var;
 
-/* Try building a SOAP request step-by-step like done by BridgeCentral or
- * http://blogs.msdn.com/b/jpsanders/archive/2007/06/14/how-to-send-soap-call-using-msxml-replace-stk.aspx */
-void test_build_soap(IXMLDOMDocument *doc)
+    V_VT(&var) = VT_BSTR;
+    V_BSTR(&var) = _bstr_(str_val);
+
+    hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
+    hr == S_OK || printf("setting attribute %s to value %s failed\n", attr, str_val);
+}
+
+
+/* Try building a SOAP request step-by-step like in the Visual Basic example
+ *    http://blogs.msdn.com/b/jpsanders/archive/2007/06/14/how-to-send-soap-call-using-msxml-replace-stk.aspx
+ * but using the attributes used by BridgeCentral.
+ */
+static void test_build_soap(IXMLDOMDocument *doc)
 {
     HRESULT hr;
     IXMLDOMProcessingInstruction *nodePI = NULL;
-    // IXMLDOMElement *element;
+    IXMLDOMElement *soapEnvelope, *soapBody, *soapCall, *soapArgs;
+
     BSTR xml;
 
     /* First set attributes like BridgeCentral would do in its request */
@@ -100,9 +115,27 @@ void test_build_soap(IXMLDOMDocument *doc)
         return;
     }
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)nodePI, NULL);
-    if(hr != S_OK)
-        printf("appending processing instruction as child to doc failed\n");
+    hr == S_OK || printf("appending processing instruction as child to doc failed\n");
+
     IXMLDOMProcessingInstruction_Release(nodePI);
+
+    hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Envelope"), &soapEnvelope);
+    hr == S_OK || printf("creation of SOAP envelope element failed\n");
+ 
+    set_attr_str(soapEnvelope, "xmlns:SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/");
+    set_attr_str(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
+    set_attr_str(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
+
+    hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)soapEnvelope, NULL);
+    hr == S_OK || printf("appending SOAP envelope as child to doc failed\n");
+
+    hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Body"), &soapBody);
+    hr == S_OK || printf("creation of SOAP body element failed\n");
+ 
+    hr = IXMLDOMElement_appendChild(soapEnvelope, (IXMLDOMNode*)soapBody, NULL);
+    hr == S_OK || printf("appending SOAP body as child to envelope failed\n");
+
+
 
     hr = IXMLDOMDocument_get_xml(doc, &xml);
     if(hr == S_OK)
@@ -111,6 +144,8 @@ void test_build_soap(IXMLDOMDocument *doc)
         printf("Getting back the XML failed\n");
     SysFreeString(xml);
 
+    IXMLDOMElement_Release(soapEnvelope);
+    IXMLDOMElement_Release(soapBody);
 }
 
 int main(void)

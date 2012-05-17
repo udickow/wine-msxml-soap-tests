@@ -13,7 +13,7 @@ CXX=i686-pc-mingw32-g++
 #LDFLAGS=-static
 LDFLAGS=-lole32 -loleaut32 -luuid
 
-CCWEXTRA=-m32
+CCWEXTRA=-m32 -Wall -Wextra -Wno-sign-compare
 
 #PROGS=hello-c.exe hello.exe tst-msxml_standalone-c.exe tst-msxml_standalone.exe
 PROGS=hello-c.exe.so tst-msxml_standalone-c.exe.so

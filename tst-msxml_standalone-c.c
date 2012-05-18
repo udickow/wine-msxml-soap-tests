@@ -85,7 +85,7 @@ static void set_attr_str(IXMLDOMElement *elem, char *attr, char *str_val)
     V_BSTR(&var) = _bstr_(str_val);
 
     hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
-    hr == S_OK || printf("setting attribute %s to value %s failed\n", attr, str_val);
+    if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
 }
 
 
@@ -115,25 +115,25 @@ static void test_build_soap(IXMLDOMDocument *doc)
         return;
     }
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)nodePI, NULL);
-    hr == S_OK || printf("appending processing instruction as child to doc failed\n");
+    if(hr != S_OK) printf("appending processing instruction as child to doc failed\n");
 
     IXMLDOMProcessingInstruction_Release(nodePI);
 
     hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Envelope"), &soapEnvelope);
-    hr == S_OK || printf("creation of SOAP envelope element failed\n");
+    if(hr != S_OK) printf("creation of SOAP envelope element failed\n");
  
     set_attr_str(soapEnvelope, "xmlns:SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/");
     set_attr_str(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
     set_attr_str(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
 
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)soapEnvelope, NULL);
-    hr == S_OK || printf("appending SOAP envelope as child to doc failed\n");
+    if(hr != S_OK) printf("appending SOAP envelope as child to doc failed\n");
 
     hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Body"), &soapBody);
-    hr == S_OK || printf("creation of SOAP body element failed\n");
+    if(hr != S_OK) printf("creation of SOAP body element failed\n");
  
     hr = IXMLDOMElement_appendChild(soapEnvelope, (IXMLDOMNode*)soapBody, NULL);
-    hr == S_OK || printf("appending SOAP body as child to envelope failed\n");
+    if(hr != S_OK) printf("appending SOAP body as child to envelope failed\n");
 
 
 

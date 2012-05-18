@@ -76,7 +76,7 @@ static void free_bstrs(void)
 }
 
 
-static void set_attr_str(IXMLDOMElement *elem, char *attr, char *str_val)
+static void set_attr_str(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
     HRESULT hr;
     VARIANT var;
@@ -112,6 +112,7 @@ static void test_build_soap(IXMLDOMDocument *doc)
     if(hr != S_OK || nodePI == NULL)
     {
         printf("createProcessingInstruction failed (returns %08x)\n", hr);
+        free_bstrs();
         return;
     }
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)nodePI, NULL);
@@ -121,7 +122,7 @@ static void test_build_soap(IXMLDOMDocument *doc)
 
     hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Envelope"), &soapEnvelope);
     if(hr != S_OK) printf("creation of SOAP envelope element failed\n");
- 
+
     set_attr_str(soapEnvelope, "xmlns:SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/");
     set_attr_str(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
     set_attr_str(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
@@ -131,7 +132,7 @@ static void test_build_soap(IXMLDOMDocument *doc)
 
     hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Body"), &soapBody);
     if(hr != S_OK) printf("creation of SOAP body element failed\n");
- 
+
     hr = IXMLDOMElement_appendChild(soapEnvelope, (IXMLDOMNode*)soapBody, NULL);
     if(hr != S_OK) printf("appending SOAP body as child to envelope failed\n");
 
@@ -146,6 +147,7 @@ static void test_build_soap(IXMLDOMDocument *doc)
 
     IXMLDOMElement_Release(soapEnvelope);
     IXMLDOMElement_Release(soapBody);
+    free_bstrs();
 }
 
 int main(void)
@@ -175,7 +177,6 @@ int main(void)
 
     test_build_soap(doc);
 
-    free_bstrs();
     IXMLDOMDocument_Release(doc);
     CoUninitialize();
     return 0;

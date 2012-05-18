@@ -91,13 +91,14 @@ static void set_attr_str(IXMLDOMElement *elem, const char *attr, const char *str
 
 /* Try building a SOAP request step-by-step like in the Visual Basic example
  *    http://blogs.msdn.com/b/jpsanders/archive/2007/06/14/how-to-send-soap-call-using-msxml-replace-stk.aspx
- * but using the attributes used by BridgeCentral.
+ * to reproduce approximately the SOAP output of BridgeCentral w/ the native dll (winetricks).
+ * Wine's msxml3 currently chokes on the calls made by BridgeCentral, spoling its SOAP login.
  */
 static void test_build_soap(IXMLDOMDocument *doc)
 {
     HRESULT hr;
     IXMLDOMProcessingInstruction *nodePI = NULL;
-    IXMLDOMElement *soapEnvelope, *soapBody, *soapCall, *soapArgs;
+    IXMLDOMElement *soapEnvelope, *soapBody, *soapCall, *soapArg1;
 
     BSTR xml;
 
@@ -136,6 +137,19 @@ static void test_build_soap(IXMLDOMDocument *doc)
     hr = IXMLDOMElement_appendChild(soapEnvelope, (IXMLDOMNode*)soapBody, NULL);
     if(hr != S_OK) printf("appending SOAP body as child to envelope failed\n");
 
+    hr = IXMLDOMDocument_createElement(doc, _bstr_("Login"), &soapCall);
+    if(hr != S_OK) printf("creation of SOAP call element failed\n");
+
+    set_attr_str(soapCall, "xmlns", "http://www.wso2.org/php/xsd");
+
+    hr = IXMLDOMElement_appendChild(soapBody, (IXMLDOMNode*)soapCall, NULL);
+    if(hr != S_OK) printf("appending SOAP call as child to body failed\n");
+
+    hr = IXMLDOMDocument_createElement(doc, _bstr_("code"), &soapArg1);
+    if(hr != S_OK) printf("creation of SOAP arg1 element failed\n");
+
+    hr = IXMLDOMElement_appendChild(soapCall, (IXMLDOMNode*)soapArg1, NULL);
+    if(hr != S_OK) printf("appending SOAP arg1 as child to call failed\n");
 
 
     hr = IXMLDOMDocument_get_xml(doc, &xml);

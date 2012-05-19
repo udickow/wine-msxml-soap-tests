@@ -90,16 +90,50 @@ static void set_attr_how1(IXMLDOMElement *elem, const char *attr, const char *st
     if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
 }
 
-/* Convoluted way of setting attributes, fails for xmlns ones in wine <= 1.5.4 */
+/* Convoluted way of setting attributes, fails for the bare xmlns in wine <= 1.5.4,
+ * but succeeds with the native msxml3 from winetricks (msxml3.msi Service Pack 7).
+ * This silly way of doing it has been reconstructed from a trace of BridgeCentral
+ * run with WINEDEBUG=msxml and then trying to enter a "DBf kode" (trigger SOAP).
+ *
+ * We first create a detached attribute node (type 2) with explicit namespace setting
+ * (that Wine may well continue to ignore for the time being -- not wanted in output),
+ * then set the value field of the node,
+ * finally apply the attribute node to the given element node.
+ * Actually we begin by crawling back from element to doc (trace does that too).
+ */
 static void set_attr_how2(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
+    const char *nsURI = "http://www.w3.org/2000/xmlns/"; // Just hardwire for this test
     HRESULT hr;
     VARIANT var;
+    IXMLDOMDocument *doc;
+    IXMLDOMAttribute *attr_node, *attr_old;
 
+    /* 0) Find doc from given element */
+    hr = IXMLDOMElement_get_ownerDocument(elem, &doc);
+    if (hr != S_OK)
+    {
+        printf("set_attr_how2: failed to find doc from elem\n");
+        return;
+    }
+
+    /* 1) Create attribute node */
+    V_VT(&var) = VT_I4;  // VT_I1 normally, but I4 seen in trace, so use that now
+    V_I4(&var) = NODE_ATTRIBUTE;
+
+    hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr),
+                                    _bstr_(nsURI), (IXMLDOMNode**)&attr_node);
+    if(hr != S_OK) printf("creating attribute node for attr='%s' seemed to fail\n", attr);
+
+    /* 2) Put attribute value into attribute node */
     V_VT(&var) = VT_BSTR;
     V_BSTR(&var) = _bstr_(str_val);
 
-    hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
+    hr = IXMLDOMAttribute_put_nodeValue(attr_node, var);
+    if(hr != S_OK) printf("putting value %s into attribute node failed\n", str_val);
+
+    /* 3) Connect/transfer our new attribute node to the given element node */
+    hr = IXMLDOMElement_setAttributeNode(elem, attr_node, &attr_old);
     if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
 }
 

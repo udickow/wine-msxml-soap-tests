@@ -47,7 +47,7 @@ static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_w
 
 /* Parts of this file come from Wine's dlls/msxml3/tests/domdoc.c */
 
-/*** BSTR helper functions from tests/domdoc.c ***/
+/***** Begin BSTR helper functions from tests/domdoc.c ***********************/
 
 static BSTR alloc_str_from_narrow(const char *str)
 {
@@ -75,8 +75,10 @@ static void free_bstrs(void)
     alloced_bstrs_count = 0;
 }
 
+/***** End BSTR helper functions from tests/domdoc.c *************************/
 
-static void set_attr_str(IXMLDOMElement *elem, const char *attr, const char *str_val)
+/* Simple, easy way of setting any attribute, including a namespace binding */
+static void set_attr_how1(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
     HRESULT hr;
     VARIANT var;
@@ -88,13 +90,37 @@ static void set_attr_str(IXMLDOMElement *elem, const char *attr, const char *str
     if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
 }
 
+/* Convoluted way of setting attributes, fails for xmlns ones in wine <= 1.5.4 */
+static void set_attr_how2(IXMLDOMElement *elem, const char *attr, const char *str_val)
+{
+    HRESULT hr;
+    VARIANT var;
+
+    V_VT(&var) = VT_BSTR;
+    V_BSTR(&var) = _bstr_(str_val);
+
+    hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
+    if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
+}
+
+static void set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val, int how)
+{
+    if(how == 1)
+        set_attr_how1(elem, attr, str_val);
+    else
+        set_attr_how2(elem, attr, str_val);
+}
+
 
 /* Try building a SOAP request step-by-step like in the Visual Basic example
  *    http://blogs.msdn.com/b/jpsanders/archive/2007/06/14/how-to-send-soap-call-using-msxml-replace-stk.aspx
  * to reproduce approximately the SOAP output of BridgeCentral w/ the native dll (winetricks).
  * Wine's msxml3 currently chokes on the calls made by BridgeCentral, spoling its SOAP login.
+ * The `how' argument determines how the namespace bindings are made:
+ *   how = 1: Set them simply with IXMLDOMElement_setAttribute (like msdn blog example)
+ *   how = 2: Set them clumsily via explicit attribute nodes (like BridgeCentral)
  */
-static void test_build_soap(IXMLDOMDocument *doc)
+static void test_build_soap(IXMLDOMDocument *doc, int how)
 {
     HRESULT hr;
     IXMLDOMProcessingInstruction *nodePI = NULL;
@@ -124,9 +150,9 @@ static void test_build_soap(IXMLDOMDocument *doc)
     hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Envelope"), &soapEnvelope);
     if(hr != S_OK) printf("creation of SOAP envelope element failed\n");
 
-    set_attr_str(soapEnvelope, "xmlns:SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/");
-    set_attr_str(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
-    set_attr_str(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
+    set_attr(soapEnvelope, "xmlns:SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/", how);
+    set_attr(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema", how);
+    set_attr(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance", how);
 
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)soapEnvelope, NULL);
     if(hr != S_OK) printf("appending SOAP envelope as child to doc failed\n");
@@ -140,7 +166,7 @@ static void test_build_soap(IXMLDOMDocument *doc)
     hr = IXMLDOMDocument_createElement(doc, _bstr_("Login"), &soapCall);
     if(hr != S_OK) printf("creation of SOAP call element failed\n");
 
-    set_attr_str(soapCall, "xmlns", "http://www.wso2.org/php/xsd");
+    set_attr(soapCall, "xmlns", "http://www.wso2.org/php/xsd", how);
 
     hr = IXMLDOMElement_appendChild(soapBody, (IXMLDOMNode*)soapCall, NULL);
     if(hr != S_OK) printf("appending SOAP call as child to body failed\n");
@@ -164,10 +190,17 @@ static void test_build_soap(IXMLDOMDocument *doc)
     free_bstrs();
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    int how;
     IXMLDOMDocument *doc;
     HRESULT hr;
+
+    if (argc != 2 || ((how = atoi(argv[1])) < 1 || how > 2))
+    {
+        printf("Usage: %s HOW\n  where HOW is 1 or 2\n", argv[0]);
+        return 1;
+    }
 
     hr = CoInitialize( NULL );
 
@@ -179,7 +212,8 @@ int main(void)
         return 1;
     }
 
-    hr = CoCreateInstance( &CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER, &IID_IXMLDOMDocument, (void**)&doc );
+    hr = CoCreateInstance( &CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER,
+                           &IID_IXMLDOMDocument, (void**)&doc );
     if (hr != S_OK)
     {
         printf("IXMLDOMDocument is not available (0x%08x)\n", hr);
@@ -189,7 +223,7 @@ int main(void)
     }
     printf("DOMDocument succesfully created\n");
 
-    test_build_soap(doc);
+    test_build_soap(doc, how);
 
     IXMLDOMDocument_Release(doc);
     CoUninitialize();

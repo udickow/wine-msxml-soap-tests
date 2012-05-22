@@ -236,62 +236,71 @@ static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *ta
 
 
 #define M_USE_ATTRIB_NODES      0x0001
-#define M_ADD_NS_AS_ATTRIB      0x0002
+#define M_ADD_NS_ATTRIB_TOP     0x0002
+#define M_ADD_NS_ATTRIB_INNER   0x0004
 
-#define M_SET_ENVE_URI_FULL     0x0004
-#define M_USE_ENVE_CREATE_ELEM  0x0008
+#define M_SET_ENVE_URI_FULL     0x0008
+#define M_USE_ENVE_CREATE_ELEM  0x0010
 
-#define M_SET_BODY_PREFIX       0x0010
-#define M_SET_BODY_URI_FULL     0x0020
-#define M_USE_BODY_CREATE_ELEM  0x0040
+#define M_SET_BODY_PREFIX       0x0020
+#define M_SET_BODY_URI_FULL     0x0040
+#define M_USE_BODY_CREATE_ELEM  0x0080
 
-#define M_SET_LOGIN_URI_FULL    0x0080
-#define M_USE_LOGIN_CREATE_ELEM 0x0100
+#define M_SET_LOGIN_URI_FULL    0x0100
+#define M_USE_LOGIN_CREATE_ELEM 0x0200
 
-#define M_SET_CODE_URI_FULL     0x0200
-#define M_USE_CODE_CREATE_ELEM  0x0400
+#define M_SET_CODE_URI_FULL     0x0400
+#define M_USE_CODE_CREATE_ELEM  0x0800
 
-#define M_TEST_FLAGS_ALL        0x07ff
+#define M_TEST_FLAGS_ALL        0x0fff
 
 /* The `how' argument determines how elements are created and namespace bindings made
  * (howN = bit N of how).  E.g. whether namespace bindings are attempted to be made
- * via explicit attributes or not, and if so, how these (reserved xmlns) attributes are set
- * (a few combinations will be excluded due to creating output too far from the intentions).
+ * via explicit attributes or not, and if so, how these (reserved xmlns) attributes are set.
  * It is absolutely relevant to test several methods, including seemingly redundant (double)
- * definition of namespace bindings, since e.g. BridgeCentral does this too:
+ * definition of namespace bindings, since e.g. BridgeCentral does this too.
+ * "Outer" bindings means the outermost binding of a given namespace.
+ * "Inner" bindings are the rest, not intended to be visible in the final XML, since
+ * mentioning those would be redundant due to inheritance from parents.
+ * However, initially each node is created outside the node tree, so the creating function
+ * can't know whether the binding will end up being redundant or not.
+ * Some combinations of flags give XML of questionable validity, but may be interesting anyway.
  *
  *   how0 = 1: Set attributes clumsily via explicit attribute nodes (like some of BridgeCentral)
  *   how0 = 0: Set attributes simply with IXMLDOMElement_setAttribute (like msdn blog example)
  *
- *   how1 = 1: Always add bindings as attributes, in addition to any other ns bindings made
- *   how1 = 0: Don't add bindings as attributes unless no other way is possible
+ *   how1 = 1: Add "outer" bindings as attributes, in addition to any other ns bindings made
+ *   how1 = 0: Don't add outer bindings as attributes
  *
- *   how2 = 1: Set Envelope ns URI fully at element creation time if possible (if createNode)
- *   how2 = 0: Set Envelope ns URI to empty string ("") at element creation time if possible
+ *   how2 = 1: Add "inner" bindings as attributes, in addition to any other ns bindings made
+ *   how2 = 0: Don't add inner bindings as attributes
  *
- *   how3 = 1: Envelope made with createElement (so ns = NULL initially if current wine used)
- *   how3 = 0: Envelope made with createNode (how2 determines whether or not empty ns set)
+ *   how3 = 1: Set Envelope ns URI fully at element creation time if possible (if createNode)
+ *   how3 = 0: Set Envelope ns URI to empty string ("") at element creation time if possible
  *
- *   how4 = 1: Body made with explicit SOAP-ENV prefix (as we really should for intended output)
- *   how4 = 0: Body made without SOAP-ENV prefix (native msxml3 may translate URI to prefix!?)
+ *   how4 = 1: Envelope made with createElement (so ns = NULL initially if current wine used)
+ *   how4 = 0: Envelope made with createNode (how2 determines whether or not empty ns set)
  *
- *   how5 = 1: Set Body ns URI fully at element creation time if possible (if createNode)
- *   how5 = 0: Set Body ns URI to empty string ("") at element creation time if possible
+ *   how5 = 1: Body made with explicit SOAP-ENV prefix (as we really should for intended output)
+ *   how5 = 0: Body made without SOAP-ENV prefix (native msxml3 may translate URI to prefix!?)
  *
- *   how6 = 1: Body made with createElement (so ns = NULL initially if current wine used)
- *   how6 = 0: Body made with createNode (how5 determines whether or not empty ns set)
+ *   how6 = 1: Set Body ns URI fully at element creation time if possible (if createNode)
+ *   how6 = 0: Set Body ns URI to empty string ("") at element creation time if possible
  *
- *   how7 = 1: Set Login ns URI fully at element creation time if possible (if createNode)
- *   how7 = 0: Set Login ns URI to empty string ("") at element creation time if possible
+ *   how7 = 1: Body made with createElement (so ns = NULL initially if current wine used)
+ *   how7 = 0: Body made with createNode (how5 determines whether or not empty ns set)
  *
- *   how8 = 1: Login made with createElement (so ns = NULL initially if current wine used)
- *   how8 = 0: Login made with createNode (how7 determines whether or not empty ns set)
+ *   how8 = 1: Set Login ns URI fully at element creation time if possible (if createNode)
+ *   how8 = 0: Set Login ns URI to empty string ("") at element creation time if possible
  *
- *   how9 = 1: Set Code ns URI fully at element creation time if possible (if createNode)
- *   how9 = 0: Set Code ns URI to empty string ("") at element creation time if possible
+ *   how9 = 1: Login made with createElement (so ns = NULL initially if current wine used)
+ *   how9 = 0: Login made with createNode (how7 determines whether or not empty ns set)
  *
- *   how10 = 1: Code made with createElement (so ns = NULL initially if current wine used)
- *   how10 = 0: Code made with createNode (how9 determines whether or not empty ns set)
+ *   how10 = 1: Set Code ns URI fully at element creation time if possible (if createNode)
+ *   how10 = 0: Set Code ns URI to empty string ("") at element creation time if possible
+ *
+ *   how11 = 1: Code made with createElement (so ns = NULL initially if current wine used)
+ *   how11 = 0: Code made with createNode (how9 determines whether or not empty ns set)
  */
 
 /* Try building a SOAP request step-by-step like in the Visual Basic example
@@ -307,8 +316,9 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
     IXMLDOMElement *soapEnvelope, *soapBody, *soapCall, *soapArg1;
 
     BSTR xml;
-    BOOL use_an  = ((how & M_USE_ATTRIB_NODES) != 0);
-    BOOL add_nsa = ((how & M_ADD_NS_AS_ATTRIB) != 0);
+    BOOL use_an   = ((how & M_USE_ATTRIB_NODES) != 0);
+    BOOL add_nsa1 = ((how & M_ADD_NS_ATTRIB_TOP) != 0);
+    BOOL add_nsa2 = ((how & M_ADD_NS_ATTRIB_INNER) != 0);
 
     /* First set attributes like BridgeCentral would do in its request */
     IXMLDOMDocument_put_preserveWhiteSpace(doc, VARIANT_FALSE);
@@ -333,7 +343,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
     soapEnvelope = create_elem_multi(doc, "SOAP-ENV:Envelope", "xmlns:SOAP-ENV",
                                      "http://schemas.xmlsoap.org/soap/envelope/",
                                      ((how & M_USE_ENVE_CREATE_ELEM) != 0),
-                                     ((how & M_SET_ENVE_URI_FULL) != 0), add_nsa, use_an);
+                                     ((how & M_SET_ENVE_URI_FULL) != 0), add_nsa1, use_an);
 
     if (soapEnvelope == NULL) return;
 
@@ -348,7 +358,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
                                  ((how & M_SET_BODY_PREFIX) ? "xmlns:SOAP-ENV" : "xmlns"),
                                  "http://schemas.xmlsoap.org/soap/envelope/",
                                  ((how & M_USE_BODY_CREATE_ELEM) != 0),
-                                 ((how & M_SET_BODY_URI_FULL) != 0), add_nsa, use_an);
+                                 ((how & M_SET_BODY_URI_FULL) != 0), add_nsa2, use_an);
 
     if (soapBody == NULL) return;
 
@@ -357,7 +367,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 
     soapCall = create_elem_multi(doc, "Login", "xmlns", "http://www.wso2.org/php/xsd",
                                      ((how & M_USE_LOGIN_CREATE_ELEM) != 0),
-                                     ((how & M_SET_LOGIN_URI_FULL) != 0), add_nsa, use_an);
+                                     ((how & M_SET_LOGIN_URI_FULL) != 0), add_nsa1, use_an);
 
     if (soapCall == NULL) return;
 
@@ -368,7 +378,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 
     soapArg1 = create_elem_multi(doc, "code", "xmlns", "http://www.wso2.org/php/xsd",
                                      ((how & M_USE_CODE_CREATE_ELEM) != 0),
-                                     ((how & M_SET_CODE_URI_FULL) != 0), add_nsa, use_an);
+                                     ((how & M_SET_CODE_URI_FULL) != 0), add_nsa2, use_an);
 
     if (soapArg1 == NULL) return;
 

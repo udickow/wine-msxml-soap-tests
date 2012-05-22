@@ -64,6 +64,9 @@
 /* undef the #define in msxml2 so that it compiles stand-alone with -luuid */
 #undef CLSID_DOMDocument
 
+#define RELEASE_ELEMENT(e) \
+    do { if (e != NULL) IXMLDOMElement_Release(e); } while(0)
+
 /* From Wine source wine/test.h: */
 extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
 static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
@@ -313,7 +316,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 {
     HRESULT hr;
     IXMLDOMProcessingInstruction *nodePI = NULL;
-    IXMLDOMElement *soapEnvelope, *soapBody, *soapCall, *soapArg1;
+    IXMLDOMElement *soapEnvelope = NULL, *soapBody = NULL, *soapCall = NULL, *soapArg1 = NULL;
 
     BSTR xml;
     BOOL use_an   = ((how & M_USE_ATTRIB_NODES) != 0);
@@ -331,8 +334,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
     if(hr != S_OK || nodePI == NULL)
     {
         printf("createProcessingInstruction failed (returns %08x)\n", hr);
-        free_bstrs();
-        return;
+        goto CleanReturn;
     }
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)nodePI, NULL);
     if(hr != S_OK) printf("appending processing instruction as child to doc failed\n");
@@ -345,7 +347,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
                                      ((how & M_USE_ENVE_CREATE_ELEM) != 0),
                                      ((how & M_SET_ENVE_URI_FULL) != 0), add_nsa1, use_an);
 
-    if (soapEnvelope == NULL) return;
+    if (soapEnvelope == NULL) goto CleanReturn;
 
     set_attr(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema", use_an);
     set_attr(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance", use_an);
@@ -360,7 +362,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
                                  ((how & M_USE_BODY_CREATE_ELEM) != 0),
                                  ((how & M_SET_BODY_URI_FULL) != 0), add_nsa2, use_an);
 
-    if (soapBody == NULL) return;
+    if (soapBody == NULL) goto CleanReturn;
 
     hr = IXMLDOMElement_appendChild(soapEnvelope, (IXMLDOMNode*)soapBody, NULL);
     if(hr != S_OK) printf("appending SOAP body as child to envelope failed\n");
@@ -369,7 +371,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
                                      ((how & M_USE_LOGIN_CREATE_ELEM) != 0),
                                      ((how & M_SET_LOGIN_URI_FULL) != 0), add_nsa1, use_an);
 
-    if (soapCall == NULL) return;
+    if (soapCall == NULL) goto CleanReturn;
 
     hr = IXMLDOMElement_appendChild(soapBody, (IXMLDOMNode*)soapCall, NULL);
     if(hr != S_OK) printf("appending SOAP call as child to body failed\n");
@@ -380,7 +382,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
                                      ((how & M_USE_CODE_CREATE_ELEM) != 0),
                                      ((how & M_SET_CODE_URI_FULL) != 0), add_nsa2, use_an);
 
-    if (soapArg1 == NULL) return;
+    if (soapArg1 == NULL) goto CleanReturn;
 
     hr = IXMLDOMElement_appendChild(soapCall, (IXMLDOMNode*)soapArg1, NULL);
     if(hr != S_OK) printf("appending SOAP arg1 as child to call failed\n");
@@ -392,10 +394,11 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
         printf("Getting back the XML failed\n");
     SysFreeString(xml);
 
-    IXMLDOMElement_Release(soapEnvelope);
-    IXMLDOMElement_Release(soapBody);
-    IXMLDOMElement_Release(soapCall);
-    IXMLDOMElement_Release(soapArg1);
+CleanReturn:
+    RELEASE_ELEMENT(soapEnvelope);
+    RELEASE_ELEMENT(soapBody);
+    RELEASE_ELEMENT(soapCall);
+    RELEASE_ELEMENT(soapArg1);
     free_bstrs();
 }
 

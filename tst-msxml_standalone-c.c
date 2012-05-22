@@ -2,10 +2,6 @@
 /*
  * XML test
  *
- * Copyright 2005 Mike McCormack for CodeWeavers
- * Copyright 2007-2008 Alistair Leslie-Hughes
- * Copyright 2010-2011 Adam Martinson for CodeWeavers
- * Copyright 2010-2012 Nikolay Sivov for CodeWeavers
  * Copyright 2012 Ulrik Dickow
  *
  * This library is free software; you can redistribute it and/or
@@ -21,6 +17,33 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+/* Parts of this file come from Wine's dlls/msxml3/tests/domdoc.c */
+
+/* This program tests XML related to WineHQ Bugzilla bug 26226,
+ * i.e. SOAP-requests made by a buhl-finance.com app and BridgeCentral.
+ * BridgeCentral, when using winetricks msxml3, sends this succesful login request:
+
+     <?xml version="1.0"?>
+     <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+         <SOAP-ENV:Body>
+             <KlubLogin xmlns="http://www.wso2.org/php/xsd">
+                 <klubnummer>.......</klubnummer>
+                 <eksportkode>......</eksportkode>
+             </KlubLogin>
+         </SOAP-ENV:Body>
+     </SOAP-ENV:Envelope>
+
+ * (whitespace added for readability, and codes replaced with dots to improve security).
+ * Wine msxml3 <= 1.5.4 fails after KlubLogin and never generates the rest or sends anything.
+ * For the test we will attempt to generate the same output, except that we shorten "KlubLogin"
+ * to "Login" and shorten the two innermost elements to a single empty "code" element <code/>
+ * -- and that we expand the test to also produce a few variations of this, possibly with
+ * slightly different meanings, especially to find differences between the native and the
+ * Wine msxml3 behaviour.
  */
 
 /* Build with: winegcc -m32 ... -lole32 -loleaut32 -luuid */
@@ -45,9 +68,7 @@
 extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
 static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
 
-/* Parts of this file come from Wine's dlls/msxml3/tests/domdoc.c */
-
-/***** Begin BSTR helper functions from tests/domdoc.c ***********************/
+/***** Begin BSTR helper functions from dlls/msxml3/tests/domdoc.c *********************/
 
 static BSTR alloc_str_from_narrow(const char *str)
 {
@@ -75,10 +96,10 @@ static void free_bstrs(void)
     alloced_bstrs_count = 0;
 }
 
-/***** End BSTR helper functions from tests/domdoc.c *************************/
+/***** End BSTR helper functions from dlls/msxml3/tests/domdoc.c ***********************/
 
 /* Simple, easy way of setting any attribute, including a namespace binding */
-static void set_attr_how1(IXMLDOMElement *elem, const char *attr, const char *str_val)
+static void set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
     HRESULT hr;
     VARIANT var;
@@ -101,9 +122,17 @@ static void set_attr_how1(IXMLDOMElement *elem, const char *attr, const char *st
  * finally apply the attribute node to the given element node.
  * Actually we begin by crawling back from element to doc (trace does that too).
  */
-static void set_attr_how2(IXMLDOMElement *elem, const char *attr, const char *str_val)
+static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
-    const char *nsURI = "http://www.w3.org/2000/xmlns/"; // Just hardwire for this test
+    /* The following namespace URI is used at initial creation of the reserved
+     * attributes "xmlns:..." and "xmlns" by both bug 26226 apps as seen in traces,
+     * and also occurs in 'strings -e l BridgeCentral.exe'.  This seems to violate
+     * http://www.w3.org/TR/xml-names/#ns-decl that says that "xlmns" is already
+     * by definition bound to this URI and MUST NOT be declared.  So Wine does well
+     * in filtering out this URI and giving a warning (perhaps too general currently)
+     * and continuing anyway.
+     */
+    const char *nsURI = "http://www.w3.org/2000/xmlns/";
     HRESULT hr;
     VARIANT var;
     IXMLDOMDocument *doc;
@@ -137,22 +166,139 @@ static void set_attr_how2(IXMLDOMElement *elem, const char *attr, const char *st
     if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
 }
 
-static void set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val, int how)
+static void set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val, BOOL use_node)
 {
-    if(how == 1)
-        set_attr_how1(elem, attr, str_val);
+    if (use_node)
+        set_attr_cplx(elem, attr, str_val);
     else
-        set_attr_how2(elem, attr, str_val);
+        set_attr_easy(elem, attr, str_val);
 }
 
+/* Create an element via createNode directly, using supplied nsURI for the namespace URI.
+ * nsURI may be the empty string ("" used by createElement according to MSDN docs)
+ * or NULL (used by createElement in Wine currently and thus not interesting to test here).
+ * The body is mostly a copy of domdoc_createElement, minus some error checking & debug.
+ */
+static IXMLDOMElement* create_elem_ns(IXMLDOMDocument *doc, const char *tagname,
+                                      const char *nsURI)
+{
+    VARIANT type;
+    HRESULT hr;
+    IXMLDOMNode *node;
+    IXMLDOMElement* element = NULL;
+
+    V_VT(&type) = VT_I1;
+    V_I1(&type) = NODE_ELEMENT;
+
+    hr = IXMLDOMDocument_createNode(doc, type, _bstr_(tagname), _bstr_(nsURI), &node);
+    if (hr == S_OK)
+    {
+        IXMLDOMNode_QueryInterface(node, &IID_IXMLDOMElement, (void**) &element);
+        IXMLDOMNode_Release(node);
+    }
+    else
+        printf("createNode for tagname '%s' w/ nsURI='%s' failed\n", tagname,
+               (nsURI == NULL ? "(NULL)" : nsURI));
+
+    return element;
+}
+
+/* Create an element in one of a multitude of possible ways, including associating a
+ * namespace simultaneously with element creation and/or adding a namespace binding
+ * as a reserved (xmlns[:prefix]) attribute.  Thus the namespace URI may be applied 0, 1
+ * or 2 times (in 2 different ways) for the given element.
+ * The xmlns_attr argument is only referenced if add_ns_as_attrib is true.
+ * In that case, it should be "xmlns:PREFIX" if name has a prefix (PREFIX:localname),
+ * and just "xmlns" if name has no prefix.  Other values are legally possible, but are
+ * not intended for use in this test (e.g. xmlns:xsd is not created by this function).
+ */
+static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *tagname,
+                                         const char *xmlns_attr,  const char *nsURI,
+                                         BOOL use_create_element, BOOL set_nsuri_full,
+                                         BOOL add_ns_as_attrib,   BOOL use_attrib_nodes)
+{
+    HRESULT hr;
+    IXMLDOMElement* elem = NULL;
+
+    if (use_create_element)
+    {
+        hr = IXMLDOMDocument_createElement(doc, _bstr_(tagname), &elem);
+        if(hr != S_OK) printf("createElement for tagname '%s' failed\n", tagname);
+    }
+    else
+        elem = create_elem_ns(doc, tagname, (set_nsuri_full ? nsURI : ""));
+
+    if (add_ns_as_attrib && elem != NULL)
+        set_attr(elem, xmlns_attr, nsURI, use_attrib_nodes);
+
+    return elem;
+}
+
+
+#define M_USE_ATTRIB_NODES      0x0001
+#define M_ADD_NS_AS_ATTRIB      0x0002
+
+#define M_SET_ENVE_URI_FULL     0x0004
+#define M_USE_ENVE_CREATE_ELEM  0x0008
+
+#define M_SET_BODY_PREFIX       0x0010
+#define M_SET_BODY_URI_FULL     0x0020
+#define M_USE_BODY_CREATE_ELEM  0x0040
+
+#define M_SET_LOGIN_URI_FULL    0x0080
+#define M_USE_LOGIN_CREATE_ELEM 0x0100
+
+#define M_SET_CODE_URI_FULL     0x0200
+#define M_USE_CODE_CREATE_ELEM  0x0400
+
+#define M_TEST_FLAGS_ALL        0x07ff
+
+/* The `how' argument determines how elements are created and namespace bindings made
+ * (howN = bit N of how).  E.g. whether namespace bindings are attempted to be made
+ * via explicit attributes or not, and if so, how these (reserved xmlns) attributes are set
+ * (a few combinations will be excluded due to creating output too far from the intentions).
+ * It is absolutely relevant to test several methods, including seemingly redundant (double)
+ * definition of namespace bindings, since e.g. BridgeCentral does this too:
+ *
+ *   how0 = 1: Set attributes clumsily via explicit attribute nodes (like some of BridgeCentral)
+ *   how0 = 0: Set attributes simply with IXMLDOMElement_setAttribute (like msdn blog example)
+ *
+ *   how1 = 1: Always add bindings as attributes, in addition to any other ns bindings made
+ *   how1 = 0: Don't add bindings as attributes unless no other way is possible
+ *
+ *   how2 = 1: Set Envelope ns URI fully at element creation time if possible (if createNode)
+ *   how2 = 0: Set Envelope ns URI to empty string ("") at element creation time if possible
+ *
+ *   how3 = 1: Envelope made with createElement (so ns = NULL initially if current wine used)
+ *   how3 = 0: Envelope made with createNode (how2 determines whether or not empty ns set)
+ *
+ *   how4 = 1: Body made with explicit SOAP-ENV prefix (as we really should for intended output)
+ *   how4 = 0: Body made without SOAP-ENV prefix (native msxml3 may translate URI to prefix!?)
+ *
+ *   how5 = 1: Set Body ns URI fully at element creation time if possible (if createNode)
+ *   how5 = 0: Set Body ns URI to empty string ("") at element creation time if possible
+ *
+ *   how6 = 1: Body made with createElement (so ns = NULL initially if current wine used)
+ *   how6 = 0: Body made with createNode (how5 determines whether or not empty ns set)
+ *
+ *   how7 = 1: Set Login ns URI fully at element creation time if possible (if createNode)
+ *   how7 = 0: Set Login ns URI to empty string ("") at element creation time if possible
+ *
+ *   how8 = 1: Login made with createElement (so ns = NULL initially if current wine used)
+ *   how8 = 0: Login made with createNode (how7 determines whether or not empty ns set)
+ *
+ *   how9 = 1: Set Code ns URI fully at element creation time if possible (if createNode)
+ *   how9 = 0: Set Code ns URI to empty string ("") at element creation time if possible
+ *
+ *   how10 = 1: Code made with createElement (so ns = NULL initially if current wine used)
+ *   how10 = 0: Code made with createNode (how9 determines whether or not empty ns set)
+ */
 
 /* Try building a SOAP request step-by-step like in the Visual Basic example
  *    http://blogs.msdn.com/b/jpsanders/archive/2007/06/14/how-to-send-soap-call-using-msxml-replace-stk.aspx
  * to reproduce approximately the SOAP output of BridgeCentral w/ the native dll (winetricks).
  * Wine's msxml3 currently chokes on the calls made by BridgeCentral, spoling its SOAP login.
- * The `how' argument determines how the namespace bindings are made:
- *   how = 1: Set them simply with IXMLDOMElement_setAttribute (like msdn blog example)
- *   how = 2: Set them clumsily via explicit attribute nodes (like BridgeCentral)
+ * The how argument is interpreted as explained above.
  */
 static void test_build_soap(IXMLDOMDocument *doc, int how)
 {
@@ -161,6 +307,8 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
     IXMLDOMElement *soapEnvelope, *soapBody, *soapCall, *soapArg1;
 
     BSTR xml;
+    BOOL use_an  = ((how & M_USE_ATTRIB_NODES) != 0);
+    BOOL add_nsa = ((how & M_ADD_NS_AS_ATTRIB) != 0);
 
     /* First set attributes like BridgeCentral would do in its request */
     IXMLDOMDocument_put_preserveWhiteSpace(doc, VARIANT_FALSE);
@@ -181,36 +329,51 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 
     IXMLDOMProcessingInstruction_Release(nodePI);
 
-    hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Envelope"), &soapEnvelope);
-    if(hr != S_OK) printf("creation of SOAP envelope element failed\n");
 
-    set_attr(soapEnvelope, "xmlns:SOAP-ENV", "http://schemas.xmlsoap.org/soap/envelope/", how);
-    set_attr(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema", how);
-    set_attr(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance", how);
+    soapEnvelope = create_elem_multi(doc, "SOAP-ENV:Envelope", "xmlns:SOAP-ENV",
+                                     "http://schemas.xmlsoap.org/soap/envelope/",
+                                     ((how & M_USE_ENVE_CREATE_ELEM) != 0),
+                                     ((how & M_SET_ENVE_URI_FULL) != 0), add_nsa, use_an);
+
+    if (soapEnvelope == NULL) return;
+
+    set_attr(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema", use_an);
+    set_attr(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance", use_an);
 
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)soapEnvelope, NULL);
     if(hr != S_OK) printf("appending SOAP envelope as child to doc failed\n");
 
-    hr = IXMLDOMDocument_createElement(doc, _bstr_("SOAP-ENV:Body"), &soapBody);
-    if(hr != S_OK) printf("creation of SOAP body element failed\n");
+    soapBody = create_elem_multi(doc,
+                                 ((how & M_SET_BODY_PREFIX) ? "SOAP-ENV:Body"  : "Body"),
+                                 ((how & M_SET_BODY_PREFIX) ? "xmlns:SOAP-ENV" : "xmlns"),
+                                 "http://schemas.xmlsoap.org/soap/envelope/",
+                                 ((how & M_USE_BODY_CREATE_ELEM) != 0),
+                                 ((how & M_SET_BODY_URI_FULL) != 0), add_nsa, use_an);
+
+    if (soapBody == NULL) return;
 
     hr = IXMLDOMElement_appendChild(soapEnvelope, (IXMLDOMNode*)soapBody, NULL);
     if(hr != S_OK) printf("appending SOAP body as child to envelope failed\n");
 
-    hr = IXMLDOMDocument_createElement(doc, _bstr_("Login"), &soapCall);
-    if(hr != S_OK) printf("creation of SOAP call element failed\n");
+    soapCall = create_elem_multi(doc, "Login", "xmlns", "http://www.wso2.org/php/xsd",
+                                     ((how & M_USE_LOGIN_CREATE_ELEM) != 0),
+                                     ((how & M_SET_LOGIN_URI_FULL) != 0), add_nsa, use_an);
 
-    set_attr(soapCall, "xmlns", "http://www.wso2.org/php/xsd", how);
+    if (soapCall == NULL) return;
 
     hr = IXMLDOMElement_appendChild(soapBody, (IXMLDOMNode*)soapCall, NULL);
     if(hr != S_OK) printf("appending SOAP call as child to body failed\n");
 
-    hr = IXMLDOMDocument_createElement(doc, _bstr_("code"), &soapArg1);
-    if(hr != S_OK) printf("creation of SOAP arg1 element failed\n");
+
+
+    soapArg1 = create_elem_multi(doc, "code", "xmlns", "http://www.wso2.org/php/xsd",
+                                     ((how & M_USE_CODE_CREATE_ELEM) != 0),
+                                     ((how & M_SET_CODE_URI_FULL) != 0), add_nsa, use_an);
+
+    if (soapArg1 == NULL) return;
 
     hr = IXMLDOMElement_appendChild(soapCall, (IXMLDOMNode*)soapArg1, NULL);
     if(hr != S_OK) printf("appending SOAP arg1 as child to call failed\n");
-
 
     hr = IXMLDOMDocument_get_xml(doc, &xml);
     if(hr == S_OK)
@@ -221,6 +384,8 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 
     IXMLDOMElement_Release(soapEnvelope);
     IXMLDOMElement_Release(soapBody);
+    IXMLDOMElement_Release(soapCall);
+    IXMLDOMElement_Release(soapArg1);
     free_bstrs();
 }
 
@@ -230,9 +395,9 @@ int main(int argc, char **argv)
     IXMLDOMDocument *doc;
     HRESULT hr;
 
-    if (argc != 2 || ((how = atoi(argv[1])) < 1 || how > 2))
+    if (argc != 2 || ((how = atoi(argv[1])) < 1 || how > M_TEST_FLAGS_ALL))
     {
-        printf("Usage: %s HOW\n  where HOW is 1 or 2\n", argv[0]);
+        printf("Usage: %s HOW\n  where HOW is an integer 1..%d\n", argv[0], M_TEST_FLAGS_ALL);
         return 1;
     }
 

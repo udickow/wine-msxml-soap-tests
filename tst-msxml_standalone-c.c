@@ -395,9 +395,9 @@ int main(int argc, char **argv)
     IXMLDOMDocument *doc;
     HRESULT hr;
 
-    if (argc != 2 || ((how = atoi(argv[1])) < 1 || how > M_TEST_FLAGS_ALL))
+    if (argc != 2 || ((how = atoi(argv[1])) < 0 || how > M_TEST_FLAGS_ALL))
     {
-        printf("Usage: %s HOW\n  where HOW is an integer 1..%d\n", argv[0], M_TEST_FLAGS_ALL);
+        printf("Usage: %s HOW\n  where HOW is an integer 0..%d\n", argv[0], M_TEST_FLAGS_ALL);
         return 1;
     }
 

@@ -101,6 +101,14 @@ static void free_bstrs(void)
 
 /***** End BSTR helper functions from dlls/msxml3/tests/domdoc.c ***********************/
 
+/* Helper macro to log the important calls, including interesting arguments, no matter
+ * the return status, but returning from the current function if HRESULT hr is not ok.
+ */
+#define CHK_HR(fmt,args...) \
+    do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : "FAIL") , ##args); \
+         if (hr != S_OK) return; \
+    } while(0)
+
 /* Simple, easy way of setting any attribute, including a namespace binding */
 static void set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
@@ -111,7 +119,7 @@ static void set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *st
     V_BSTR(&var) = _bstr_(str_val);
 
     hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
-    if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
+    CHK_HR("setAttribute (attr = \"%s\", value = \"%s\"\n", attr, str_val);
 }
 
 /* Convoluted way of setting attributes, fails for the bare xmlns in wine <= 1.5.4,
@@ -157,22 +165,19 @@ static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *st
 
     hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr),
                                     _bstr_(nsURI), (IXMLDOMNode**)&attr_node);
-    printf("%s <-- " "createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n",
-           (hr == S_OK ? "ok  " : "FAIL"), attr, nsURI);
-    if (hr != S_OK) return;
+
+    CHK_HR("createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n", attr, nsURI);
 
     /* 2) Put attribute value into attribute node */
     V_VT(&var) = VT_BSTR;
     V_BSTR(&var) = _bstr_(str_val);
 
     hr = IXMLDOMAttribute_put_nodeValue(attr_node, var);
-    printf("%s <-- " "  put_nodeValue (value = \"%s\")\n",
-           (hr == S_OK ? "ok  " : "FAIL"), str_val);
-    if (hr != S_OK) return;
+    CHK_HR("  put_nodeValue (value = \"%s\")\n", str_val);
 
     /* 3) Connect/transfer our new attribute node to the given element node */
     hr = IXMLDOMElement_setAttributeNode(elem, attr_node, &attr_old);
-    printf("%s <-- " "  setAttributeNode\n", (hr == S_OK ? "ok  " : "FAIL"));
+    CHK_HR("  setAttributeNode\n");
 }
 
 static void set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val, BOOL use_node)

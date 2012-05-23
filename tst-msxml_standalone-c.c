@@ -67,9 +67,17 @@
 #define RELEASE_ELEMENT(e) \
     do { if (e != NULL) IXMLDOMElement_Release(e); } while(0)
 
-/* From Wine source wine/test.h: */
+/* From Wine source wine/test.h (limited to about 300 chars of output): */
 extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
 static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
+
+/* From dlls/oleaut32/tests/vartype.c (but I increase buffer size here): */
+static const char* wtoascii(LPWSTR lpszIn)
+{
+    static char buff[2048];
+    WideCharToMultiByte(CP_ACP, 0, lpszIn, -1, buff, sizeof(buff), NULL, NULL);
+    return buff;
+}
 
 /***** Begin BSTR helper functions from dlls/msxml3/tests/domdoc.c *********************/
 
@@ -408,7 +416,12 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 
     hr = IXMLDOMDocument_get_xml(doc, &xml);
     if(hr == S_OK)
-        printf("Got back this XML (shown as a dbgstr):\n%s\n", wine_dbgstr_w(xml));
+    {
+        // printf("dbgstr(XML(%0x)) = %s\n", how, wine_dbgstr_w(xml));
+        printf("========== Generated XML in free form: ============\n%s%s",
+               wtoascii(xml),
+               "===================================================\n");
+    }
     else
         printf("Getting back the XML failed\n");
     SysFreeString(xml);

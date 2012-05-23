@@ -119,7 +119,7 @@ static HRESULT set_attr_easy(IXMLDOMElement *elem, const char *attr, const char 
     V_BSTR(&var) = _bstr_(str_val);
 
     hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
-    CHK_HR("setAttribute (attr = \"%s\", value = \"%s\"\n", attr, str_val);
+    CHK_HR("  setAttribute (attr = \"%s\", value = \"%s\"\n", attr, str_val);
 
 CleanReturn:
     return hr;
@@ -169,18 +169,19 @@ static HRESULT set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char 
     hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr),
                                     _bstr_(nsURI), (IXMLDOMNode**)&attr_node);
 
-    CHK_HR("createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n", attr, nsURI);
+    CHK_HR("  createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n",
+           attr, nsURI);
 
     /* 2) Put attribute value into attribute node */
     V_VT(&var) = VT_BSTR;
     V_BSTR(&var) = _bstr_(str_val);
 
     hr = IXMLDOMAttribute_put_nodeValue(attr_node, var);
-    CHK_HR("  put_nodeValue (value = \"%s\")\n", str_val);
+    CHK_HR("    put_nodeValue (value = \"%s\")\n", str_val);
 
     /* 3) Connect/transfer our new attribute node to the given element node */
     hr = IXMLDOMElement_setAttributeNode(elem, attr_node, &attr_old);
-    CHK_HR("  setAttributeNode\n");
+    CHK_HR("    setAttributeNode\n");
 
 CleanReturn:
     return hr;
@@ -194,11 +195,12 @@ static HRESULT set_attr(IXMLDOMElement *elem, const char *attr, const char *str_
 }
 
 /* Create an element via createNode directly, using supplied nsURI for the namespace URI.
- * nsURI may be the empty string ("" used by createElement according to MSDN docs)
- * or NULL (used by createElement in Wine currently and thus not interesting to test here).
+ * nsURI may be the empty string ("" used by createElement according to MSDN docs).
+ * NULL is used by createElement in Wine currently and thus not interesting to test here;
+ * in fact we forbid it.
  * The body is mostly a copy of domdoc_createElement, minus some error checking & debug.
  */
-static IXMLDOMElement* create_elem_ns(IXMLDOMDocument *doc, const char *tagname,
+static IXMLDOMElement* create_elem_ns(IXMLDOMDocument *doc, const char *name,
                                       const char *nsURI)
 {
     VARIANT type;
@@ -206,19 +208,18 @@ static IXMLDOMElement* create_elem_ns(IXMLDOMDocument *doc, const char *tagname,
     IXMLDOMNode *node;
     IXMLDOMElement* element = NULL;
 
+    assert(nsURI != NULL);
+
     V_VT(&type) = VT_I1;
     V_I1(&type) = NODE_ELEMENT;
 
-    hr = IXMLDOMDocument_createNode(doc, type, _bstr_(tagname), _bstr_(nsURI), &node);
-    if (hr == S_OK)
-    {
-        IXMLDOMNode_QueryInterface(node, &IID_IXMLDOMElement, (void**) &element);
-        IXMLDOMNode_Release(node);
-    }
-    else
-        printf("createNode for tagname '%s' w/ nsURI='%s' failed\n", tagname,
-               (nsURI == NULL ? "(NULL)" : nsURI));
+    hr = IXMLDOMDocument_createNode(doc, type, _bstr_(name), _bstr_(nsURI), &node);
+    CHK_HR("createNode (type = NODE_ELEMENT, name = \"%s\", nsURI = \"%s\")\n", name, nsURI);
 
+    IXMLDOMNode_QueryInterface(node, &IID_IXMLDOMElement, (void**) &element);
+    IXMLDOMNode_Release(node);
+
+CleanReturn:
     return element;
 }
 
@@ -231,7 +232,7 @@ static IXMLDOMElement* create_elem_ns(IXMLDOMDocument *doc, const char *tagname,
  * and just "xmlns" if name has no prefix.  Other values are legally possible, but are
  * not intended for use in this test (e.g. xmlns:xsd is not created by this function).
  */
-static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *tagname,
+static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *name,
                                          const char *xmlns_attr,  const char *nsURI,
                                          BOOL use_create_element, BOOL set_nsuri_full,
                                          BOOL add_ns_as_attrib,   BOOL use_attrib_nodes)
@@ -241,15 +242,16 @@ static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *ta
 
     if (use_create_element)
     {
-        hr = IXMLDOMDocument_createElement(doc, _bstr_(tagname), &elem);
-        if(hr != S_OK) printf("createElement for tagname '%s' failed\n", tagname);
+        hr = IXMLDOMDocument_createElement(doc, _bstr_(name), &elem);
+        CHK_HR("createElement (name = \"%s\")\n", name);
     }
     else
-        elem = create_elem_ns(doc, tagname, (set_nsuri_full ? nsURI : ""));
+        elem = create_elem_ns(doc, name, (set_nsuri_full ? nsURI : ""));
 
     if (add_ns_as_attrib && elem != NULL)
         hr = set_attr(elem, xmlns_attr, nsURI, use_attrib_nodes);
 
+CleanReturn:
     return elem;
 }
 

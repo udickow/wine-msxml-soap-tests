@@ -145,7 +145,7 @@ static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *st
     hr = IXMLDOMElement_get_ownerDocument(elem, &doc);
     if (hr != S_OK)
     {
-        printf("set_attr_how2: failed to find doc from elem\n");
+        printf("set_attr_cplx: failed to find doc from elem\n");
         return;
     }
 
@@ -155,18 +155,22 @@ static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *st
 
     hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr),
                                     _bstr_(nsURI), (IXMLDOMNode**)&attr_node);
-    if(hr != S_OK) printf("creating attribute node for attr='%s' seemed to fail\n", attr);
+    printf("%s <-- " "createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n",
+           (hr == S_OK ? "ok  " : "FAIL"), attr, nsURI);
+    if (hr != S_OK) return;
 
     /* 2) Put attribute value into attribute node */
     V_VT(&var) = VT_BSTR;
     V_BSTR(&var) = _bstr_(str_val);
 
     hr = IXMLDOMAttribute_put_nodeValue(attr_node, var);
-    if(hr != S_OK) printf("putting value %s into attribute node failed\n", str_val);
+    printf("%s <-- " "  put_nodeValue (value = \"%s\")\n",
+           (hr == S_OK ? "ok  " : "FAIL"), str_val);
+    if (hr != S_OK) return;
 
     /* 3) Connect/transfer our new attribute node to the given element node */
     hr = IXMLDOMElement_setAttributeNode(elem, attr_node, &attr_old);
-    if(hr != S_OK) printf("setting attribute %s to value %s failed\n", attr, str_val);
+    printf("%s <-- " "  setAttributeNode\n", (hr == S_OK ? "ok  " : "FAIL"));
 }
 
 static void set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val, BOOL use_node)

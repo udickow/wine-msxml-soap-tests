@@ -444,7 +444,7 @@ int main(int argc, char **argv)
     {
         printf("Usage: %s HOW\n  where HOW is an integer 0..%d\n%s\n",
                argv[0], M_TEST_FLAGS_ALL,
-               "  Some interesting values to test: 2738, 2739, 1398, 1399");
+               "  Some interesting values to test: 2738, 2739, 1384, 1398, 1399");
         return 1;
     }
 

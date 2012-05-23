@@ -433,7 +433,7 @@ int main(int argc, char **argv)
         CoUninitialize();
         return 1;
     }
-    printf("DOMDocument succesfully created\n");
+    printf("DOMDocument successfully created\n");
 
     test_build_soap(doc, how);
 

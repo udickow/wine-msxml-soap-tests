@@ -106,11 +106,11 @@ static void free_bstrs(void)
  */
 #define CHK_HR(fmt,args...) \
     do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : "FAIL") , ##args); \
-         if (hr != S_OK) return; \
+         if (hr != S_OK) goto CleanReturn; \
     } while(0)
 
 /* Simple, easy way of setting any attribute, including a namespace binding */
-static void set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *str_val)
+static HRESULT set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
     HRESULT hr;
     VARIANT var;
@@ -120,6 +120,9 @@ static void set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *st
 
     hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
     CHK_HR("setAttribute (attr = \"%s\", value = \"%s\"\n", attr, str_val);
+
+CleanReturn:
+    return hr;
 }
 
 /* Convoluted way of setting attributes, fails for the bare xmlns in wine <= 1.5.4,
@@ -133,7 +136,7 @@ static void set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *st
  * finally apply the attribute node to the given element node.
  * Actually we begin by crawling back from element to doc (trace does that too).
  */
-static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *str_val)
+static HRESULT set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
     /* The following namespace URI is used at initial creation of the reserved
      * attributes "xmlns:..." and "xmlns" by both bug 26226 apps as seen in traces,
@@ -154,9 +157,9 @@ static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *st
     /* 0) Find doc from given element */
     hr = IXMLDOMElement_get_ownerDocument(elem, &doc);
     if (hr != S_OK)
-    {
+    {   /* This error should never happen. */
         printf("set_attr_cplx: failed to find doc from elem\n");
-        return;
+        goto CleanReturn;
     }
 
     /* 1) Create attribute node */
@@ -178,14 +181,16 @@ static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *st
     /* 3) Connect/transfer our new attribute node to the given element node */
     hr = IXMLDOMElement_setAttributeNode(elem, attr_node, &attr_old);
     CHK_HR("  setAttributeNode\n");
+
+CleanReturn:
+    return hr;
 }
 
-static void set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val, BOOL use_node)
+static HRESULT set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val,
+                        BOOL use_node)
 {
-    if (use_node)
-        set_attr_cplx(elem, attr, str_val);
-    else
-        set_attr_easy(elem, attr, str_val);
+    return (use_node ? set_attr_cplx(elem, attr, str_val)
+                     : set_attr_easy(elem, attr, str_val));
 }
 
 /* Create an element via createNode directly, using supplied nsURI for the namespace URI.
@@ -243,7 +248,7 @@ static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *ta
         elem = create_elem_ns(doc, tagname, (set_nsuri_full ? nsURI : ""));
 
     if (add_ns_as_attrib && elem != NULL)
-        set_attr(elem, xmlns_attr, nsURI, use_attrib_nodes);
+        hr = set_attr(elem, xmlns_attr, nsURI, use_attrib_nodes);
 
     return elem;
 }
@@ -360,8 +365,9 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 
     if (soapEnvelope == NULL) goto CleanReturn;
 
-    set_attr(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema", use_an);
-    set_attr(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance", use_an);
+    hr = set_attr(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema", use_an);
+    hr = set_attr(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance",
+                  use_an);
 
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)soapEnvelope, NULL);
     if(hr != S_OK) printf("appending SOAP envelope as child to doc failed\n");

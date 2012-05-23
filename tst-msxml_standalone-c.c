@@ -129,11 +129,13 @@ static void set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *st
 {
     /* The following namespace URI is used at initial creation of the reserved
      * attributes "xmlns:..." and "xmlns" by both bug 26226 apps as seen in traces,
-     * and also occurs in 'strings -e l BridgeCentral.exe'.  This seems to violate
-     * http://www.w3.org/TR/xml-names/#ns-decl that says that "xlmns" is already
-     * by definition bound to this URI and MUST NOT be declared.  So Wine does well
-     * in filtering out this URI and giving a warning (perhaps too general currently)
-     * and continuing anyway.
+     * and also occurs in 'strings -e l BridgeCentral.exe'.  Note that W3C says in
+     * http://www.w3.org/TR/xml-names/#ns-decl that "xlmns" is already by definition
+     * bound to this URI and MUST NOT be declared.  (OTOH Microsoft's
+     * http://msdn.microsoft.com/en-us/library/windows/desktop/ms757901%28v=vs.85%29.aspx
+     * says that prefixed names MUST have a non-empty nsURI in the createNode call).
+     * So Wine should continue to filter out this URI (for attribute xmlns[:...]) even
+     * if it some day begins to support namespaced attribute nodes properly.
      */
     const char *nsURI = "http://www.w3.org/2000/xmlns/";
     HRESULT hr;

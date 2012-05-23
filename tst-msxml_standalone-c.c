@@ -442,7 +442,9 @@ int main(int argc, char **argv)
 
     if (argc != 2 || ((how = atoi(argv[1])) < 0 || how > M_TEST_FLAGS_ALL))
     {
-        printf("Usage: %s HOW\n  where HOW is an integer 0..%d\n", argv[0], M_TEST_FLAGS_ALL);
+        printf("Usage: %s HOW\n  where HOW is an integer 0..%d\n%s\n",
+               argv[0], M_TEST_FLAGS_ALL,
+               "  Some interesting values to test: 2738, 2739, 1398, 1399");
         return 1;
     }
 

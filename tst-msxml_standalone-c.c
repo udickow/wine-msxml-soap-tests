@@ -418,9 +418,9 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
     if(hr == S_OK)
     {
         // printf("dbgstr(XML(%0x)) = %s\n", how, wine_dbgstr_w(xml));
-        printf("========== Generated XML in free form: ============\n%s%s",
-               wtoascii(xml),
-               "===================================================\n");
+        printf("========== Generated XML (how = %4d = 0x%04x): ==========\n%s%s",
+               how, how, wtoascii(xml),
+               "==========================================================\n");
     }
     else
         printf("Getting back the XML failed\n");
@@ -444,7 +444,7 @@ int main(int argc, char **argv)
     {
         printf("Usage: %s HOW\n  where HOW is an integer 0..%d\n%s\n",
                argv[0], M_TEST_FLAGS_ALL,
-               "  Some interesting values to test: 2738, 2739, 1384, 1398, 1399");
+               "  Some interesting values to test: 2738, 2739, 1384, 3400, 1398, 1399");
         return 1;
     }
 

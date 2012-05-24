@@ -67,11 +67,11 @@
 #define RELEASE_ELEMENT(e) \
     do { if (e != NULL) IXMLDOMElement_Release(e); } while(0)
 
-/* From Wine source wine/test.h (limited to about 300 chars of output): */
-extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
-static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
+/* From Wine source wine/test.h (limited to about 300 chars of output, not enough for us): */
+// extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
+// static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
 
-/* From dlls/oleaut32/tests/vartype.c (but I increase buffer size here): */
+/* Simple hack from dlls/oleaut32/tests/vartype.c (but with increased buffer size here): */
 static const char* wtoascii(LPWSTR lpszIn)
 {
     static char buff[2048];
@@ -308,7 +308,7 @@ CleanReturn:
  *   how3 = 0: Set Envelope ns URI to empty string ("") at element creation time if possible
  *
  *   how4 = 1: Envelope made with createElement (so ns = NULL initially if current wine used)
- *   how4 = 0: Envelope made with createNode (how2 determines whether or not empty ns set)
+ *   how4 = 0: Envelope made with createNode (how3 determines whether or not empty ns set)
  *
  *   how5 = 1: Body made with explicit SOAP-ENV prefix (as we really should for intended output)
  *   how5 = 0: Body made without SOAP-ENV prefix (native msxml3 may translate URI to prefix!?)
@@ -317,25 +317,25 @@ CleanReturn:
  *   how6 = 0: Set Body ns URI to empty string ("") at element creation time if possible
  *
  *   how7 = 1: Body made with createElement (so ns = NULL initially if current wine used)
- *   how7 = 0: Body made with createNode (how5 determines whether or not empty ns set)
+ *   how7 = 0: Body made with createNode (how6 determines whether or not empty ns set)
  *
  *   how8 = 1: Set Login ns URI fully at element creation time if possible (if createNode)
  *   how8 = 0: Set Login ns URI to empty string ("") at element creation time if possible
  *
  *   how9 = 1: Login made with createElement (so ns = NULL initially if current wine used)
- *   how9 = 0: Login made with createNode (how7 determines whether or not empty ns set)
+ *   how9 = 0: Login made with createNode (how8 determines whether or not empty ns set)
  *
  *   how10 = 1: Set Code ns URI fully at element creation time if possible (if createNode)
  *   how10 = 0: Set Code ns URI to empty string ("") at element creation time if possible
  *
  *   how11 = 1: Code made with createElement (so ns = NULL initially if current wine used)
- *   how11 = 0: Code made with createNode (how9 determines whether or not empty ns set)
+ *   how11 = 0: Code made with createNode (how10 determines whether or not empty ns set)
  */
 
 /* Try building a SOAP request step-by-step like in the Visual Basic example
  *    http://blogs.msdn.com/b/jpsanders/archive/2007/06/14/how-to-send-soap-call-using-msxml-replace-stk.aspx
  * to reproduce approximately the SOAP output of BridgeCentral w/ the native dll (winetricks).
- * Wine's msxml3 currently chokes on the calls made by BridgeCentral, spoling its SOAP login.
+ * Wine's msxml3 currently chokes on the calls made by BridgeCentral, spoiling its SOAP login.
  * The how argument is interpreted as explained above.
  */
 static void test_build_soap(IXMLDOMDocument *doc, int how)

@@ -240,10 +240,11 @@ CleanReturn:
  * and just "xmlns" if name has no prefix.  Other values are legally possible, but are
  * not intended for use in this test (e.g. xmlns:xsd is not created by this function).
  */
-static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *name,
-                                         const char *xmlns_attr,  const char *nsURI,
-                                         BOOL use_create_element, BOOL set_nsuri_full,
-                                         BOOL add_ns_as_attrib,   BOOL use_attrib_nodes)
+static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    IXMLDOMElement *parent,
+                                         const char *name,        const char *xmlns_attr,
+                                         const char *nsURI,       BOOL use_create_element,
+                                         BOOL set_nsuri_full,     BOOL add_ns_as_attrib,
+                                         BOOL use_attrib_nodes,   BOOL set_attrib_delayed)
 {
     HRESULT hr;
     IXMLDOMElement* elem = NULL;
@@ -256,7 +257,18 @@ static IXMLDOMElement* create_elem_multi(IXMLDOMDocument *doc,    const char *na
     else
         elem = create_elem_ns(doc, name, (set_nsuri_full ? nsURI : ""));
 
-    if (add_ns_as_attrib && elem != NULL)
+    if (elem == NULL) return NULL;
+
+    if (!set_attrib_delayed && add_ns_as_attrib)
+        hr = set_attr(elem, xmlns_attr, nsURI, use_attrib_nodes);
+
+    if (parent != NULL)
+    {
+        hr = IXMLDOMElement_appendChild(parent, (IXMLDOMNode*)elem, NULL);
+        CHK_HR("  appendChild (child element = \"%s\")\n", name);
+    }
+
+    if (set_attrib_delayed && add_ns_as_attrib)
         hr = set_attr(elem, xmlns_attr, nsURI, use_attrib_nodes);
 
 CleanReturn:
@@ -281,7 +293,9 @@ CleanReturn:
 #define M_SET_CODE_URI_FULL     0x0400
 #define M_USE_CODE_CREATE_ELEM  0x0800
 
-#define M_TEST_FLAGS_ALL        0x0fff
+#define M_SET_ATTRIB_DELAYED    0x1000
+
+#define M_TEST_FLAGS_ALL        0x1fff
 
 /* The `how' argument determines how elements are created and namespace bindings made
  * (howN = bit N of how).  E.g. whether namespace bindings are attempted to be made
@@ -330,7 +344,13 @@ CleanReturn:
  *
  *   how11 = 1: Code made with createElement (so ns = NULL initially if current wine used)
  *   how11 = 0: Code made with createNode (how10 determines whether or not empty ns set)
+ *
+ *   how12 = 1: Setting of attributes is done AFTER connecting element node to parent element
+ *   how12 = 0: Setting of attributes is done BEFORE connecting element node to parent element
  */
+
+#define CHK_NULL(expression) \
+    do { if ((expression) == NULL) goto CleanReturn; } while(0)
 
 /* Try building a SOAP request step-by-step like in the Visual Basic example
  *    http://blogs.msdn.com/b/jpsanders/archive/2007/06/14/how-to-send-soap-call-using-msxml-replace-stk.aspx
@@ -348,6 +368,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
     BOOL use_an   = ((how & M_USE_ATTRIB_NODES) != 0);
     BOOL add_nsa1 = ((how & M_ADD_NS_ATTRIB_TOP) != 0);
     BOOL add_nsa2 = ((how & M_ADD_NS_ATTRIB_INNER) != 0);
+    BOOL a_delay  = ((how & M_SET_ATTRIB_DELAYED) != 0);
 
     /* First set attributes like BridgeCentral would do in its request */
     IXMLDOMDocument_put_preserveWhiteSpace(doc, VARIANT_FALSE);
@@ -367,13 +388,11 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
 
     IXMLDOMProcessingInstruction_Release(nodePI);
 
-
-    soapEnvelope = create_elem_multi(doc, "SOAP-ENV:Envelope", "xmlns:SOAP-ENV",
-                                     "http://schemas.xmlsoap.org/soap/envelope/",
-                                     ((how & M_USE_ENVE_CREATE_ELEM) != 0),
-                                     ((how & M_SET_ENVE_URI_FULL) != 0), add_nsa1, use_an);
-
-    if (soapEnvelope == NULL) goto CleanReturn;
+    CHK_NULL(soapEnvelope =
+             create_elem_multi(doc, NULL, "SOAP-ENV:Envelope", "xmlns:SOAP-ENV",
+                               "http://schemas.xmlsoap.org/soap/envelope/",
+                               ((how & M_USE_ENVE_CREATE_ELEM) != 0),
+                               ((how & M_SET_ENVE_URI_FULL) != 0), add_nsa1, use_an, a_delay));
 
     hr = set_attr(soapEnvelope, "xmlns:xsd", "http://www.w3.org/2001/XMLSchema", use_an);
     hr = set_attr(soapEnvelope, "xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance",
@@ -382,37 +401,21 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)soapEnvelope, NULL);
     if(hr != S_OK) printf("appending SOAP envelope as child to doc failed\n");
 
-    soapBody = create_elem_multi(doc,
-                                 ((how & M_SET_BODY_PREFIX) ? "SOAP-ENV:Body"  : "Body"),
-                                 ((how & M_SET_BODY_PREFIX) ? "xmlns:SOAP-ENV" : "xmlns"),
-                                 "http://schemas.xmlsoap.org/soap/envelope/",
-                                 ((how & M_USE_BODY_CREATE_ELEM) != 0),
-                                 ((how & M_SET_BODY_URI_FULL) != 0), add_nsa2, use_an);
-
-    if (soapBody == NULL) goto CleanReturn;
-
-    hr = IXMLDOMElement_appendChild(soapEnvelope, (IXMLDOMNode*)soapBody, NULL);
-    if(hr != S_OK) printf("appending SOAP body as child to envelope failed\n");
-
-    soapCall = create_elem_multi(doc, "Login", "xmlns", "http://www.wso2.org/php/xsd",
-                                     ((how & M_USE_LOGIN_CREATE_ELEM) != 0),
-                                     ((how & M_SET_LOGIN_URI_FULL) != 0), add_nsa1, use_an);
-
-    if (soapCall == NULL) goto CleanReturn;
-
-    hr = IXMLDOMElement_appendChild(soapBody, (IXMLDOMNode*)soapCall, NULL);
-    if(hr != S_OK) printf("appending SOAP call as child to body failed\n");
-
-
-
-    soapArg1 = create_elem_multi(doc, "code", "xmlns", "http://www.wso2.org/php/xsd",
-                                     ((how & M_USE_CODE_CREATE_ELEM) != 0),
-                                     ((how & M_SET_CODE_URI_FULL) != 0), add_nsa2, use_an);
-
-    if (soapArg1 == NULL) goto CleanReturn;
-
-    hr = IXMLDOMElement_appendChild(soapCall, (IXMLDOMNode*)soapArg1, NULL);
-    if(hr != S_OK) printf("appending SOAP arg1 as child to call failed\n");
+    CHK_NULL(soapBody =
+             create_elem_multi(doc, soapEnvelope,
+                               ((how & M_SET_BODY_PREFIX) ? "SOAP-ENV:Body"  : "Body"),
+                               ((how & M_SET_BODY_PREFIX) ? "xmlns:SOAP-ENV" : "xmlns"),
+                               "http://schemas.xmlsoap.org/soap/envelope/",
+                               ((how & M_USE_BODY_CREATE_ELEM) != 0),
+                               ((how & M_SET_BODY_URI_FULL) != 0), add_nsa2, use_an, a_delay));
+    CHK_NULL(soapCall =
+             create_elem_multi(doc, soapBody, "Login", "xmlns", "http://www.wso2.org/php/xsd",
+                               ((how & M_USE_LOGIN_CREATE_ELEM) != 0),
+                               ((how & M_SET_LOGIN_URI_FULL) != 0), add_nsa1, use_an, a_delay));
+    CHK_NULL(soapArg1 =
+             create_elem_multi(doc, soapCall, "code", "xmlns", "http://www.wso2.org/php/xsd",
+                               ((how & M_USE_CODE_CREATE_ELEM) != 0),
+                               ((how & M_SET_CODE_URI_FULL) != 0), add_nsa2, use_an, a_delay));
 
     hr = IXMLDOMDocument_get_xml(doc, &xml);
     if(hr == S_OK)
@@ -444,7 +447,8 @@ int main(int argc, char **argv)
     {
         printf("Usage: %s HOW\n  where HOW is an integer 0..%d\n%s\n",
                argv[0], M_TEST_FLAGS_ALL,
-               "  Some interesting values to test: 2738, 2739, 1384, 3400, 1398, 1399");
+               "  Some interesting values to test:\n"
+               "    2738 2739 1384 1395 5491 5495 3400 1394 1398 1399");
         return 1;
     }
 

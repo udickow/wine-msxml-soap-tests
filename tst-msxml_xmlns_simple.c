@@ -221,10 +221,25 @@ CleanReturn:
 }
 
 
-static void test_xmlns(void)
+static void print_xml(const char *fmt, IXMLDOMElement *elem)
 {
     HRESULT hr;
     BSTR xml;
+
+    hr = IXMLDOMElement_get_xml(elem, &xml);
+    if(hr == S_OK)
+    {
+        printf(fmt, wine_dbgstr_w(xml));
+    }
+    else
+        printf("Getting back the XML failed\n");
+    SysFreeString(xml);
+}
+
+
+static void test_xmlns(void)
+{
+    HRESULT hr;
     IXMLDOMElement *elem1, *elem2;
 
     IXMLDOMDocument *doc = create_doc();
@@ -238,14 +253,7 @@ static void test_xmlns(void)
     hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
     CHK_HR("appendChild (elem1, elem2, NULL)\n");
 
-    hr = IXMLDOMElement_get_xml(elem1, &xml);
-    if(hr == S_OK)
-    {
-        printf("dbgstr(elem1) = %s\n", wine_dbgstr_w(xml));
-    }
-    else
-        printf("Getting back the XML failed\n");
-    SysFreeString(xml);
+    print_xml("dbgstr(elem1) = %s\n", elem1);
 
 CleanReturn:
     RELEASE_ELEMENT(elem1);

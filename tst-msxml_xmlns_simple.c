@@ -264,9 +264,22 @@ static void test_xmlns(void)
     elem2 = create_elem_ns(doc, "pre:bar", "urn:ns2");
 
     hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
-    CHK_HR("appendChild (elem1, elem2, NULL)\n");
+    CHK_HR("appendChild (pre:foo, pre:bar, NULL)\n");
 
-    print_xml("dbgstr(elem1) = %s\n", elem1);
+    print_xml("dbgstr(pre:foo) = %s\n", elem1);
+
+    RELEASE_ELEMENT(elem2);
+
+    /* Test re-binding in 2 steps instead.  Important for test that connect in-between. */
+
+    elem2 = create_elem_ns(doc, "pre:baz", "");
+
+    hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
+    CHK_HR("appendChild (pre:foo, pre:baz, NULL)\n");
+
+    set_attr(elem2, "xmlns:pre", "urn:ns3", TRUE);
+
+    print_xml("dbgstr(pre:foo) = %s\n", elem1);
 
 CleanReturn:
     RELEASE_ELEMENT(elem1);

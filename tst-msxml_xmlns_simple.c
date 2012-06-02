@@ -255,6 +255,19 @@ static void test_xmlns(void)
 
     print_xml("dbgstr(elem1) = %s\n", elem1);
 
+    RELEASE_ELEMENT(elem1);
+    RELEASE_ELEMENT(elem2);
+
+    /* Test re-binding of prefix to different ns in children, ok with W3C. */
+
+    elem1 = create_elem_ns(doc, "pre:foo", "urn:ns1");
+    elem2 = create_elem_ns(doc, "pre:bar", "urn:ns2");
+
+    hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
+    CHK_HR("appendChild (elem1, elem2, NULL)\n");
+
+    print_xml("dbgstr(elem1) = %s\n", elem1);
+
 CleanReturn:
     RELEASE_ELEMENT(elem1);
     RELEASE_ELEMENT(elem2);

@@ -1,19 +1,35 @@
 Quality of generated XML w.r.t. wanted output.  Meaning must be preserved.
 
+"Outer" below means the levels of SOAP-ENV:Envelope (outmost use of envelope namespace)
+and of Login (outmost use of wso2.org namespace).
+
+"Top" means only at the level of SOAP-ENV:Envelope (the top level).
+
+"createNode E + A" means createNode used for creation of elements as well as attributes.
+
+"attr late" means attributes are added _after_ the element has been connected to a parent.
+
 Quality ratings:
 	1_Optimal = Perfect, optimized, no redunant declarations
 	2_equiv  = Sub-optimal, NS bindings needlessly repeated in children
 	4_danger = Dangerously close to different meaning (if new children added later on)
 	5_diff   = Valid XML, no errors, but different meaning than wanted (e.g. an empty NS)
 	8_silly  = Same NS binding is given twice in a row (xmlns... xmlns..., ugly & silly)
-	9_FAIL   = S_OK was NOT returned by setAttributeNode, so BridgeCentral would fail
+	9_FAIL   = S_OK was NOT returned by all functions (e.g. setAttributeNode failed)
 
-Flags	Native		Built-in1.5.3-165...
+Flags	Native		Built-in1.5.5	Meaning_of_flags
 2738	1_Optimal	1_Optimal	createElement + setAttribute outer only ("hand-optim.")
 1384	1_Optimal	2_equiv		createNode E (+ setAttribute only for the 2 *Schema*)
-1395	1_Optimal	9_FAIL		createNode E + A outer only (/ createElement outmost)
-1399	2_equiv		9_FAIL		createNode E + A (/ createElement outmost)
+1395	1_Optimal	9_FAIL		createNode E + A outer only (/ createElement top)
+5491	1_Optimal	9_FAIL		createNode E + A outer only (/ -"-), attr late
+1139	1_Optimal	9_FAIL		createNode E + A outer only (/ -"-), Login nsURI=""!
+1651	1_Optimal	9_FAIL		createNode E inner + A outer, createElement outer
+1399	2_equiv		9_FAIL		createNode E + A (/ createElement top)
+5495	2_equiv		9_FAIL		createNode E + A (/ createElement top), attr late
+6839	2_equiv		9_FAIL		createElement + createNode A, attr late
+6807	4_danger	9_FAIL		createElement + createNode A, attr late, no Body prefix
 3400	5_diff		4_danger	createNode E except code createElement, no Body prefix
 2739	5_diff		9_FAIL		createElement + createNode A outer only
-1394	8_silly		8_silly		createNode E (/ cElem outmost) + setAttribute outer only
-1398	8_silly		8_silly		createNode E (/ cElem outmost) + setAttribute
+1394	8_silly		8_silly		createNode E (/ cElem top) + setAttribute outer only
+1398	8_silly		8_silly		createNode E (/ cElem top) + setAttribute
+4150	9_FAIL		9_FAIL		createNode E + setAttribute, nsURI="" for all elements

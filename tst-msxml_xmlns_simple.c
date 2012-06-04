@@ -82,8 +82,14 @@ static void free_bstrs(void)
  * the return status, but returning from the current function if HRESULT hr is not ok.
  */
 #define CHK_HR(fmt,args...) \
-    do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : "FAIL") , ##args); \
+    do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : \
+                                 (hr == S_FALSE ? "False" : "FAIL")) , ##args); \
          if (hr != S_OK) goto CleanReturn; \
+    } while(0)
+
+#define PRT_HR(fmt,args...) \
+    do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : \
+                                 (hr == S_FALSE ? "False" : "FAIL")) , ##args); \
     } while(0)
 
 /* Simple, easy way of setting any attribute, including a namespace binding */
@@ -164,13 +170,6 @@ CleanReturn:
     return hr;
 }
 
-static HRESULT set_attr(IXMLDOMElement *elem, const char *attr, const char *str_val,
-                        BOOL use_node)
-{
-    return (use_node ? set_attr_cplx(elem, attr, str_val)
-                     : set_attr_easy(elem, attr, str_val));
-}
-
 /* Create an element via createNode directly, using supplied nsURI for the namespace URI.
  * nsURI may be the empty string ("" used by createElement according to MSDN docs).
  * NULL is used by createElement in Wine currently and thus not interesting to test here;
@@ -240,11 +239,13 @@ static void print_xml(const char *fmt, IXMLDOMElement *elem)
 static void test_xmlns(void)
 {
     HRESULT hr;
+    BSTR str;
     IXMLDOMElement *elem1, *elem2;
 
     IXMLDOMDocument *doc = create_doc();
     if (doc == NULL) return;
 
+    printf("================================ Test 01 ======================================\n");
     /* Test inheritance and possible duplication of default namespace */
 
     elem1 = create_elem_ns(doc, "elem1", "urn:ns1");
@@ -258,6 +259,7 @@ static void test_xmlns(void)
     RELEASE_ELEMENT(elem1);
     RELEASE_ELEMENT(elem2);
 
+    printf("================================ Test 02 ======================================\n");
     /* Test re-binding of prefix to different ns in children, ok with W3C. */
 
     elem1 = create_elem_ns(doc, "pre:foo", "urn:ns1");
@@ -279,10 +281,41 @@ static void test_xmlns(void)
     hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
     CHK_HR("appendChild (pre:foo, pre:baz, NULL)\n");
 
-    // set_attr(elem2, "xmlns:pre", "urn:ns3", TRUE);
-    set_attr(elem2, "xmlns:pre", "urn:ns3", FALSE);
+    // set_attr_cplx(elem2, "xmlns:pre", "urn:ns3");
+    set_attr_easy(elem2, "xmlns:pre", "urn:ns3");
 
     print_xml("dbgstr(pre:foo) = %s\n", elem1);
+
+    RELEASE_ELEMENT(elem1);
+    RELEASE_ELEMENT(elem2);
+
+    printf("================================ Test 03 ======================================\n");
+    /* Test if setting attribute "xmlns" via setAttributeNode affects get_namespaceURI
+     * for the element (if element name is unqualified and with empty namespace beforehand).
+     * For native msxml3 it _does_ affect suppression of this namespace in get_xml for a child.
+     */
+
+    elem1 = create_elem_ns(doc, "parent", "");
+
+    hr = IXMLDOMElement_get_namespaceURI(elem1, &str);
+    PRT_HR("  get_namespaceURI (parent, returned %s)\n", wine_dbgstr_w(str));
+
+    set_attr_cplx(elem1, "xmlns", "urn:ns4");
+
+    hr = IXMLDOMElement_get_namespaceURI(elem1, &str);
+    PRT_HR("  get_namespaceURI (parent, returned %s)\n", wine_dbgstr_w(str));
+
+    elem2 = create_elem_ns(doc, "child", "urn:ns4");
+
+    hr = IXMLDOMElement_get_namespaceURI(elem2, &str);
+    PRT_HR("  get_namespaceURI (child, returned %s)\n", wine_dbgstr_w(str));
+
+    hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
+    PRT_HR("appendChild (parent, child, NULL)\n");
+
+    print_xml("dbgstr(child) = %s\n", elem2);
+    print_xml("dbgstr(parent) = %s\n", elem1);
+
 
 CleanReturn:
     RELEASE_ELEMENT(elem1);

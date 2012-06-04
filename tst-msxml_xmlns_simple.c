@@ -255,6 +255,7 @@ static void test_xmlns(void)
     CHK_HR("appendChild (elem1, elem2, NULL)\n");
 
     print_xml("dbgstr(elem1) = %s\n", elem1);
+    print_xml("dbgstr(elem2) = %s\n", elem2);
 
     RELEASE_ELEMENT(elem1);
     RELEASE_ELEMENT(elem2);
@@ -313,8 +314,8 @@ static void test_xmlns(void)
     hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
     PRT_HR("appendChild (parent, child, NULL)\n");
 
-    print_xml("dbgstr(child) = %s\n", elem2);
     print_xml("dbgstr(parent) = %s\n", elem1);
+    print_xml("dbgstr(child)  = %s\n", elem2);
 
 
 CleanReturn:

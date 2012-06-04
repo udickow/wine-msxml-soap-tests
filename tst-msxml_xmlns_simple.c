@@ -82,13 +82,13 @@ static void free_bstrs(void)
  * the return status, but returning from the current function if HRESULT hr is not ok.
  */
 #define CHK_HR(fmt,args...) \
-    do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : \
+    do { printf("%-5s <-- " fmt , (hr == S_OK ? "ok" : \
                                  (hr == S_FALSE ? "False" : "FAIL")) , ##args); \
          if (hr != S_OK) goto CleanReturn; \
     } while(0)
 
 #define PRT_HR(fmt,args...) \
-    do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : \
+    do { printf("%-5s <-- " fmt , (hr == S_OK ? "ok" : \
                                  (hr == S_FALSE ? "False" : "FAIL")) , ##args); \
     } while(0)
 

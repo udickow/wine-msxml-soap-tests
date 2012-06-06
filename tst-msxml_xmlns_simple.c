@@ -300,16 +300,19 @@ static void test_xmlns(void)
 
     hr = IXMLDOMElement_get_namespaceURI(elem1, &str);
     PRT_HR("  get_namespaceURI (parent, returned %s)\n", wine_dbgstr_w(str));
+    SysFreeString(str);
 
     set_attr_cplx(elem1, "xmlns", "urn:ns4");
 
     hr = IXMLDOMElement_get_namespaceURI(elem1, &str);
     PRT_HR("  get_namespaceURI (parent, returned %s)\n", wine_dbgstr_w(str));
+    SysFreeString(str);
 
     elem2 = create_elem_ns(doc, "child", "urn:ns4");
 
     hr = IXMLDOMElement_get_namespaceURI(elem2, &str);
     PRT_HR("  get_namespaceURI (child, returned %s)\n", wine_dbgstr_w(str));
+    SysFreeString(str);
 
     hr = IXMLDOMElement_appendChild(elem1, (IXMLDOMNode*)elem2, NULL);
     PRT_HR("appendChild (parent, child, NULL)\n");

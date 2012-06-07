@@ -38,7 +38,7 @@
      </SOAP-ENV:Envelope>
 
  * (whitespace added for readability, and codes replaced with dots to improve security).
- * Wine msxml3 <= 1.5.4 fails after KlubLogin and never generates the rest or sends anything.
+ * Wine msxml3 <= 1.5.3+ fails after KlubLogin and never generates the rest or sends anything.
  * For the test we will attempt to generate the same output, except that we shorten "KlubLogin"
  * to "Login" and shorten the two innermost elements to a single empty "code" element <code/>
  * -- and that we expand the test to also produce a few variations of this, possibly with
@@ -121,7 +121,8 @@ static VARIANT _variantbstr_(const char *str)
  * the return status, but returning from the current function if HRESULT hr is not ok.
  */
 #define CHK_HR(fmt,args...) \
-    do { printf("%s <-- " fmt , (hr == S_OK ? "ok  " : "FAIL") , ##args); \
+    do { printf("%-5s <-- " fmt , (hr == S_OK ? "ok" : \
+                                 (hr == S_FALSE ? "False" : "FAIL")) , ##args); \
          if (hr != S_OK) goto CleanReturn; \
     } while(0)
 

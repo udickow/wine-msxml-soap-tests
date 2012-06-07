@@ -76,6 +76,14 @@ static void free_bstrs(void)
     alloced_bstrs_count = 0;
 }
 
+static VARIANT _variantbstr_(const char *str)
+{
+    VARIANT v;
+    V_VT(&v) = VT_BSTR;
+    V_BSTR(&v) = _bstr_(str);
+    return v;
+}
+
 /***** End BSTR helper functions from dlls/msxml3/tests/domdoc.c ***********************/
 
 /* Helper macro to log the important calls, including interesting arguments, no matter
@@ -92,49 +100,38 @@ static void free_bstrs(void)
                                  (hr == S_FALSE ? "False" : "FAIL")) , ##args); \
     } while(0)
 
-/* Simple, easy way of setting any attribute, including a namespace binding */
+/* Easy way of setting an attribute, but without any connection to namespaces
+ * (native msxml3 treats xmlns* like any other attribute, possibly giving silly xml).
+ */
 static HRESULT set_attr_easy(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
-    HRESULT hr;
-    VARIANT var;
-
-    V_VT(&var) = VT_BSTR;
-    V_BSTR(&var) = _bstr_(str_val);
-
-    hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), var);
+    HRESULT hr = IXMLDOMElement_setAttribute(elem, _bstr_(attr), _variantbstr_(str_val));
     CHK_HR("  setAttribute (attr = \"%s\", value = \"%s\"\n", attr, str_val);
 
 CleanReturn:
     return hr;
 }
 
-/* Convoluted way of setting attributes, fails for the bare xmlns in wine <= 1.5.4,
- * but succeeds with the native msxml3 from winetricks (msxml3.msi Service Pack 7).
- * This silly way of doing it has been reconstructed from a trace of BridgeCentral
- * run with WINEDEBUG=msxml and then trying to enter a "DBf kode" (trigger SOAP).
+/* Complex way of setting attributes, including proper namespace information,
+ * here specialized to work only for the reserved xmlns* attributes,
+ * i.e. the namespace with URI http://www.w3.org/2000/xmlns/ .
+ * Fails for the bare "xmlns" in wine <= 1.5.5, but succeeds with the native msxml3
+ * from winetricks (msxml3.msi Service Pack 7).
+ * This way of doing it has been reconstructed from a trace of BridgeCentral
+ * run with WINEDEBUG=msxml and then trying to enter a "DBf kode" (triggers SOAP code).
  *
- * We first create a detached attribute node (type 2) with explicit namespace setting
- * (that Wine may well continue to ignore for the time being -- not wanted in output),
- * then set the value field of the node,
- * finally apply the attribute node to the given element node.
+ * We first create a detached attribute node (type 2) with explicit namespace setting,
+ * then set the value field of the node, and finally apply the attribute node to the
+ * given element node.
  * Actually we begin by crawling back from element to doc (trace does that too).
  */
 static HRESULT set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char *str_val)
 {
-    /* The following namespace URI is used at initial creation of the reserved
-     * attributes "xmlns:..." and "xmlns" by both bug 26226 apps as seen in traces,
-     * and also occurs in 'strings -e l BridgeCentral.exe'.  Note that W3C says in
-     * http://www.w3.org/TR/xml-names/#ns-decl that "xlmns" is already by definition
-     * bound to this URI and MUST NOT be declared.  (OTOH Microsoft's
-     * http://msdn.microsoft.com/en-us/library/windows/desktop/ms757901%28v=vs.85%29.aspx
-     * says that prefixed names MUST have a non-empty nsURI in the createNode call).
-     * So Wine should continue to filter out this URI (for attribute xmlns[:...]) even
-     * if it some day begins to support namespaced attribute nodes properly.
-     */
     const char *nsURI = "http://www.w3.org/2000/xmlns/";
     HRESULT hr;
     VARIANT var;
     IXMLDOMDocument *doc;
+    IXMLDOMNode *node;
     IXMLDOMAttribute *attr_node, *attr_old;
 
     /* 0) Find doc from given element */
@@ -142,24 +139,23 @@ static HRESULT set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char 
     if (hr != S_OK)
     {   /* This error should never happen. */
         printf("set_attr_cplx: failed to find doc from elem\n");
-        goto CleanReturn;
+        return hr;
     }
 
     /* 1) Create attribute node */
-    V_VT(&var) = VT_I4;  // VT_I1 normally, but I4 seen in trace, so use that now
+    V_VT(&var) = VT_I4;  // VT_I1 often used, but I4 seen in trace, so use that now
     V_I4(&var) = NODE_ATTRIBUTE;
 
-    hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr),
-                                    _bstr_(nsURI), (IXMLDOMNode**)&attr_node);
+    hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr), _bstr_(nsURI), &node);
 
     CHK_HR("  createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n",
            attr, nsURI);
 
-    /* 2) Put attribute value into attribute node */
-    V_VT(&var) = VT_BSTR;
-    V_BSTR(&var) = _bstr_(str_val);
+    IXMLDOMNode_QueryInterface(node, &IID_IXMLDOMAttribute, (void**) &attr_node);
+    IXMLDOMNode_Release(node);
 
-    hr = IXMLDOMAttribute_put_nodeValue(attr_node, var);
+    /* 2) Put attribute value into attribute node */
+    hr = IXMLDOMAttribute_put_nodeValue(attr_node, _variantbstr_(str_val));
     CHK_HR("    put_nodeValue (value = \"%s\")\n", str_val);
 
     /* 3) Connect/transfer our new attribute node to the given element node */

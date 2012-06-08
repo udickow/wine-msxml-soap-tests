@@ -112,6 +112,32 @@ CleanReturn:
     return hr;
 }
 
+/* Create an attribute node in a given namespace (and log for our verbose test). */
+static HRESULT create_attribute_ns(
+    IXMLDOMDocument *doc,
+    const char *attr_name,
+    const char *nsURI,
+    IXMLDOMAttribute **attr_ptr)
+{
+    HRESULT hr;
+    VARIANT var;
+    IXMLDOMNode *node;
+
+    V_VT(&var) = VT_I4;  // VT_I1 often used, but I4 seen in trace, so use that now
+    V_I4(&var) = NODE_ATTRIBUTE;
+
+    hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr_name), _bstr_(nsURI), &node);
+
+    CHK_HR("  createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n",
+           attr_name, nsURI);
+
+    IXMLDOMNode_QueryInterface(node, &IID_IXMLDOMAttribute, (void**) attr_ptr);
+    IXMLDOMNode_Release(node);
+
+CleanReturn:
+    return hr;
+}
+
 /* Complex way of setting attributes, including proper namespace information,
  * here specialized to work only for the reserved xmlns* attributes,
  * i.e. the namespace with URI http://www.w3.org/2000/xmlns/ .
@@ -129,9 +155,7 @@ static HRESULT set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char 
 {
     const char *nsURI = "http://www.w3.org/2000/xmlns/";
     HRESULT hr;
-    VARIANT var;
     IXMLDOMDocument *doc;
-    IXMLDOMNode *node;
     IXMLDOMAttribute *attr_node, *attr_old;
 
     /* 0) Find doc from given element */
@@ -143,16 +167,8 @@ static HRESULT set_attr_cplx(IXMLDOMElement *elem, const char *attr, const char 
     }
 
     /* 1) Create attribute node */
-    V_VT(&var) = VT_I4;  // VT_I1 often used, but I4 seen in trace, so use that now
-    V_I4(&var) = NODE_ATTRIBUTE;
-
-    hr = IXMLDOMDocument_createNode(doc, var, _bstr_(attr), _bstr_(nsURI), &node);
-
-    CHK_HR("  createNode (type = NODE_ATTRIBUTE, attr = \"%s\", nsURI = \"%s\")\n",
-           attr, nsURI);
-
-    IXMLDOMNode_QueryInterface(node, &IID_IXMLDOMAttribute, (void**) &attr_node);
-    IXMLDOMNode_Release(node);
+    hr = create_attribute_ns(doc, attr, nsURI, &attr_node);
+    if (hr != S_OK) return hr;
 
     /* 2) Put attribute value into attribute node */
     hr = IXMLDOMAttribute_put_nodeValue(attr_node, _variantbstr_(str_val));

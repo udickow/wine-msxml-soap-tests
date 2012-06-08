@@ -247,6 +247,14 @@ static void print_xml(const char *fmt, IXMLDOMElement *elem)
     SysFreeString(xml);
 }
 
+static void test_xmlns_uri(IXMLDOMDocument *doc, const char *name, const char *nsURI)
+{
+    IXMLDOMAttribute *attr_node;
+
+    create_attribute_ns(doc, name, nsURI, &attr_node);
+    IXMLDOMAttribute_Release(attr_node);
+}
+
 
 static void test_xmlns(void)
 {
@@ -332,6 +340,23 @@ static void test_xmlns(void)
     print_xml("dbgstr(parent) = %s\n", elem1);
     print_xml("dbgstr(child)  = %s\n", elem2);
 
+    printf("================================ Test 04 ======================================\n");
+    /* Test combinations of the xmlns namespace or its URI in attribute node creation */
+
+    test_xmlns_uri(doc, "xmlns", "http://www.w3.org/2000/xmlns/"); /* Legal */
+    test_xmlns_uri(doc, "xmlns:foo", "http://www.w3.org/2000/xmlns/"); /* Legal */
+
+    test_xmlns_uri(doc, "xmlns", "http://www.w3.org/2000/xmlns"); /* Illegal */
+    test_xmlns_uri(doc, "xmlns:foo", "http://www.w3.org/2000/xmlns"); /* Illegal */
+
+    test_xmlns_uri(doc, "xmlns", "http://www.winehq.org/"); /* Illegal */
+    test_xmlns_uri(doc, "xmlns:foo", "http://www.winehq.org/"); /* Illegal */
+
+    test_xmlns_uri(doc, "myprefix", "http://www.w3.org/2000/xmlns/"); /* Illegal */
+    test_xmlns_uri(doc, "gnus:gnats", "http://www.w3.org/2000/xmlns/"); /* Illegal */
+
+    test_xmlns_uri(doc, "myprefix", "http://www.w3.org/2000/xmlns"); /* Legal, but danger */
+    test_xmlns_uri(doc, "gnus:gnats", "http://www.w3.org/2000/xmlns"); /* Legal, but danger */
 
 CleanReturn:
     RELEASE_ELEMENT(elem1);

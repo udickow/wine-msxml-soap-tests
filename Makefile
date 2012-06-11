@@ -16,7 +16,8 @@ LDFLAGS=-lole32 -loleaut32 -luuid
 CFLAGS=-O2
 CCWEXTRA=-m32 -Wall -Wextra -Wno-sign-compare
 
-PROGS=hello-c.exe.so tst-msxml_make_soap.exe.so tst-msxml_xmlns_simple.exe.so
+PROGS=hello-c.exe.so tst-msxml_make_soap.exe.so tst-msxml_xmlns_simple.exe.so \
+	tst-switch_strcmpW.exe.so
 
 %.exe: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(INCLUDES) -o $@ $< $(LDFLAGS)

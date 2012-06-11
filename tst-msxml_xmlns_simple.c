@@ -340,6 +340,19 @@ static void test_xmlns(void)
     print_xml("dbgstr(parent) = %s\n", elem1);
     print_xml("dbgstr(child)  = %s\n", elem2);
 
+    printf("            -------------------------------------------------------------------\n");
+
+    set_attr_cplx(elem2, "xmlns", "urn:ns5");
+    print_xml("dbgstr(parent)  = %s\n", elem1);
+    print_xml("dbgstr(child)  = %s\n", elem2);
+
+    hr = IXMLDOMElement_get_namespaceURI(elem2, &str);
+    PRT_HR("  get_namespaceURI (child, returned %s)\n", wine_dbgstr_w(str));
+    SysFreeString(str);
+
+    set_attr_cplx(elem2, "xmlns", "urn:ns4");
+    print_xml("dbgstr(parent)  = %s\n", elem1);
+
     printf("================================ Test 04 ======================================\n");
     /* Test combinations of the xmlns namespace or its URI in attribute node creation */
 

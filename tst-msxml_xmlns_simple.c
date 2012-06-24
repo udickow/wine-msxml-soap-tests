@@ -123,6 +123,8 @@ static HRESULT create_attribute_ns(
     VARIANT var;
     IXMLDOMNode *node;
 
+    *attr_ptr = NULL;
+
     V_VT(&var) = VT_I4;  // VT_I1 often used, but I4 seen in trace, so use that now
     V_I4(&var) = NODE_ATTRIBUTE;
 
@@ -251,8 +253,8 @@ static void test_xmlns_uri(IXMLDOMDocument *doc, const char *name, const char *n
 {
     IXMLDOMAttribute *attr_node;
 
-    create_attribute_ns(doc, name, nsURI, &attr_node);
-    IXMLDOMAttribute_Release(attr_node);
+    if (create_attribute_ns(doc, name, nsURI, &attr_node) == S_OK)
+        IXMLDOMAttribute_Release(attr_node);
 }
 
 

@@ -61,15 +61,17 @@
 #include "ole2.h"
 #include "dispex.h"
 
+#ifdef OLD_WINE
+#define PRIxHR "x"
+#else
+#define PRIxHR "lx"
+#endif
+
 /* undef the #define in msxml2 so that it compiles stand-alone with -luuid */
 #undef CLSID_DOMDocument
 
 #define RELEASE_ELEMENT(e) \
     do { if (e != NULL) IXMLDOMElement_Release(e); } while(0)
-
-/* From Wine source wine/test.h (limited to about 300 chars of output, not enough for us): */
-// extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
-// static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
 
 /* Simple hack from dlls/oleaut32/tests/vartype.c (but with increased buffer size here): */
 static const char* wtoascii(LPWSTR lpszIn)
@@ -377,7 +379,7 @@ static void test_build_soap(IXMLDOMDocument *doc, int how)
                                                      _bstr_("version=\"1.0\""), &nodePI);
     if(hr != S_OK || nodePI == NULL)
     {
-        printf("createProcessingInstruction failed (returns %08x)\n", hr);
+        printf("createProcessingInstruction failed (returns %08"PRIxHR")\n", hr);
         goto CleanReturn;
     }
     hr = IXMLDOMDocument_appendChild(doc, (IXMLDOMNode*)nodePI, NULL);
@@ -464,7 +466,7 @@ int main(int argc, char **argv)
                            &IID_IXMLDOMDocument, (void**)&doc );
     if (hr != S_OK)
     {
-        printf("IXMLDOMDocument is not available (0x%08x)\n", hr);
+        printf("IXMLDOMDocument is not available (0x%08"PRIxHR")\n", hr);
 
         CoUninitialize();
         return 1;

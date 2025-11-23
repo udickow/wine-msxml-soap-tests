@@ -2,11 +2,25 @@
 #include <assert.h>
 
 #include "windows.h"
-#include "wine/unicode.h"
+/* #include "wine/unicode.h" */
+#include "wine/debug.h"
 
-/* From Wine source wine/test.h (limited to about 300 chars of output, ok for us here): */
-extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
-static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
+/***** Begin wine/unicode.h was in wine <= 3.4 but isn't in 10.15.  Inline from 3.4 source here. ******/
+
+static inline int strcmpW( const WCHAR *str1, const WCHAR *str2 )
+{
+    while (*str1 && (*str1 == *str2)) { str1++; str2++; }
+    return *str1 - *str2;
+}
+
+static inline int strncmpW( const WCHAR *str1, const WCHAR *str2, int n )
+{
+    if (n <= 0) return 0;
+    while ((--n > 0) && *str1 && (*str1 == *str2)) { str1++; str2++; }
+    return *str1 - *str2;
+}
+
+/***** End of str*cmpW from old wine/unicode.h *****/
 
 /***** Begin BSTR helper functions from dlls/msxml3/tests/domdoc.c *********************/
 static BSTR alloc_str_from_narrow(const char *str)

@@ -1,6 +1,9 @@
 WINEPREFIX ?= $(HOME)/.wine
 WINEROOT=/opt/wine
-INCLUDES=-I$(WINEROOT)/include/wine/windows
+# WINEROOT may be overriden on the command line with e.g. 'make WINEROOT=/usr'
+#   We add WINEROOT/include to include path so that wine/debug.h can be found
+#   also on old self-built wines in /opt/ (modern wine 10.15 doesn't need it).
+INCLUDES=-I$(WINEROOT)/include/wine/windows -I$(WINEROOT)/include
 
 CCW=winegcc
 CXXW=wineg++

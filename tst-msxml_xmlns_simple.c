@@ -38,15 +38,13 @@
 #include "ole2.h"
 #include "dispex.h"
 
+#include "wine/debug.h"
+
 /* undef the #define in msxml2 so that it compiles stand-alone with -luuid */
 #undef CLSID_DOMDocument
 
 #define RELEASE_ELEMENT(e) \
     do { if (e != NULL) IXMLDOMElement_Release(e); } while(0)
-
-/* From Wine source wine/test.h (limited to about 300 chars of output, ok for us here): */
-extern const char *wine_dbgstr_wn( const WCHAR *str, int n );
-static inline const char *wine_dbgstr_w( const WCHAR *s ) { return wine_dbgstr_wn( s, -1 ); }
 
 /***** Begin BSTR helper functions from dlls/msxml3/tests/domdoc.c *********************/
 
